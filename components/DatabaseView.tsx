@@ -57,6 +57,7 @@ const BeerRecipeModal: React.FC<{
         }
 
         const ricettaToSave = ricetta
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             .map(({ uiId, ...rest }) => ({ ...rest, qta: parseFloat(String(rest.qta).replace(',', '.')) || 0 }))
             .filter(r => r.nome && r.qta > 0);
 
@@ -126,6 +127,48 @@ const BeerRecipeModal: React.FC<{
 };
 
 
+const EditClientModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    clientToEdit: Cliente | null;
+    onSave: (_client: Cliente) => Promise<void>;
+}> = ({ isOpen, onClose, clientToEdit, onSave }) => {
+    const [formData, setFormData] = useState<Cliente | null>(null);
+
+    useEffect(() => {
+        setFormData(clientToEdit);
+    }, [clientToEdit]);
+
+    const handleChange = (field: keyof Cliente, value: string) => {
+        if (formData) {
+            setFormData({ ...formData, [field]: value });
+        }
+    };
+
+    const handleSave = () => {
+        if (formData) {
+            onSave(formData);
+        }
+    };
+
+    if (!formData) return null;
+
+    return (
+        <Modal title="Modifica Cliente" isOpen={isOpen} onClose={onClose}>
+            <div className="space-y-4">
+                <Field label="Nome Cliente"><Input value={formData.nome} onChange={e => handleChange('nome', e.target.value)} /></Field>
+                <Field label="Ragione Sociale"><Input value={formData.ragioneSociale || ''} onChange={e => handleChange('ragioneSociale', e.target.value)} /></Field>
+                <Field label="Partita IVA"><Input value={formData.partitaIva || ''} onChange={e => handleChange('partitaIva', e.target.value)} /></Field>
+                <Field label="Sede Sociale"><Input value={formData.sedeSociale || ''} onChange={e => handleChange('sedeSociale', e.target.value)} /></Field>
+                <Field label="Numero di Telefono"><Input value={formData.numeroTelefono || ''} onChange={e => handleChange('numeroTelefono', e.target.value)} /></Field>
+                <div className="flex justify-end pt-4">
+                    <button onClick={handleSave} className="bg-brew-green text-white font-bold py-2 px-4 rounded-md hover:bg-opacity-80">Salva Modifiche</button>
+                </div>
+            </div>
+        </Modal>
+    );
+};
+
 export const DatabaseView: React.FC<DatabaseViewProps> = ({ selectedYear }) => {
     const [clienti, setClienti] = useState<Cliente[]>([]);
     const [birre, setBirre] = useState<Birra[]>([]);
@@ -135,6 +178,8 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({ selectedYear }) => {
     const { showToast } = useToast();
 
     const [modalState, setModalState] = useState<{isOpen: boolean, clienteId: string | null, beerToEdit: Birra | null}>({isOpen: false, clienteId: null, beerToEdit: null});
+    const [editClientModalOpen, setEditClientModalOpen] = useState(false);
+    const [clientToEdit, setClientToEdit] = useState<Cliente | null>(null);
 
     const loadData = useCallback(async () => {
         const data = await getBreweryData(selectedYear);
@@ -221,6 +266,19 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({ selectedYear }) => {
         loadData();
     };
 
+    const handleEditClient = (cliente: Cliente) => {
+        setClientToEdit(cliente);
+        setEditClientModalOpen(true);
+    };
+
+    const saveEditedClient = async (updatedClient: Cliente) => {
+        await upsertItemInSheet(selectedYear, 'CLIENTI', updatedClient, 'id');
+        await loadData();
+        setEditClientModalOpen(false);
+        setClientToEdit(null);
+        showToast("Cliente modificato con successo!", 'success');
+    };
+
 
     return (
         <div className="space-y-6">
@@ -249,7 +307,10 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({ selectedYear }) => {
                             {cliente.partitaIva && <p className="text-sm text-slate-400">P.IVA: {cliente.partitaIva}</p>}
                             {cliente.sedeSociale && <p className="text-sm text-slate-400">Sede: {cliente.sedeSociale}</p>}
                             {cliente.numeroTelefono && <p className="text-sm text-slate-400">Tel: {cliente.numeroTelefono}</p>}
-                            <button onClick={() => handleDeleteRequest('cliente', cliente.id)} className="text-red-500 hover:text-red-400"><TrashIcon className="w-6 h-6"/></button>
+                            <div className="flex items-center gap-2">
+                                <button onClick={() => handleEditClient(cliente)} className="text-brew-blue hover:text-blue-400"><PencilIcon className="w-6 h-6"/></button>
+                                <button onClick={() => handleDeleteRequest('cliente', cliente.id)} className="text-red-500 hover:text-red-400"><TrashIcon className="w-6 h-6"/></button>
+                            </div>
                         </div>
                         
                         <div className="pl-4">
@@ -317,6 +378,15 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({ selectedYear }) => {
                     clienteId={modalState.clienteId!}
                     beerToEdit={modalState.beerToEdit}
                     warehouseDb={warehouseDb}
+                />
+            )}
+            
+            {editClientModalOpen && (
+                <EditClientModal
+                    isOpen={editClientModalOpen}
+                    onClose={() => setEditClientModalOpen(false)}
+                    clientToEdit={clientToEdit}
+                    onSave={saveEditedClient}
                 />
             )}
         </div>
