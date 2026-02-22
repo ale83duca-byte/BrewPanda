@@ -15,6 +15,7 @@ export default {
         'brew-green': '#27ae60',
         'brew-red': '#c0392b',
         'brew-orange': '#d35400',
+        'brew-purple': '#8e44ad',
       },
     },
   },

@@ -226,6 +226,19 @@ export interface BeerInventoryCheck {
     items: BeerInventoryCheckItem[];
 }
 
+export interface BeerPriceList {
+    beerName: string;
+    prices: Record<string, number>; // Format -> Price
+}
+
+export interface ClientOffer {
+    id: string;
+    clientId: string;
+    clientName: string;
+    date: string;
+    prices: Record<string, Record<string, number>>; // BeerName -> Format -> Price
+}
+
 export interface BreweryData {
   MOVIMENTAZIONE: Movement[];
   DATABASE: DatabaseItem[];
@@ -244,6 +257,8 @@ export interface BreweryData {
   BEER_MOVEMENTS: BeerMovement[];
   SALES_ORDERS: SalesOrder[];
   BEER_INVENTORY_CHECKS: BeerInventoryCheck[];
+  BEER_PRICE_LIST: BeerPriceList[];
+  CLIENT_OFFERS: ClientOffer[];
 }
 
 export type BrewerySheet = keyof BreweryData;

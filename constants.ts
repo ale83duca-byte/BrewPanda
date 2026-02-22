@@ -34,3 +34,14 @@ export const CONFIG_PACKAGING: Record<string, { pezziPerCartone: number; litriUn
     "FUSTO POLYKEG 20LT CON SACCA": { pezziPerCartone: 1, litriUnit: 20.0, nomeInvCont: "FUSTO POLYKEG 20LT CON SACCA", nomeInvScatola: null },
     "FUSTO POLYKEG 24LT CON SACCA": { pezziPerCartone: 1, litriUnit: 24.0, nomeInvCont: "FUSTO POLYKEG 24LT CON SACCA", nomeInvScatola: null },
 };
+
+export const PRICE_LIST_FORMATS = [
+    'FUSTI 20 LT',
+    'FUSTO 5 LT',
+    'FUSTI 24 LT',
+    'CARTONI 75X6',
+    'CARTONI 50X15',
+    'CARTONI 33X12',
+    'CARTONI 33X24',
+    'ACCIAIO 20 LT'
+];

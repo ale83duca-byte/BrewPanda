@@ -33,7 +33,9 @@ import { BeerInventoryView } from './components/BeerInventoryView';
 import { SalesTrendView } from './components/SalesTrendView';
 import { FactoryResetModal } from './components/FactoryResetModal';
 
-export type View = 'HOME' | 'MOVEMENTS' | 'WAREHOUSE' | 'BREW_PAGE' | 'CANTINA' | 'DATABASE' | 'COST_ANALYSIS' | 'PRODUCTION_TREND' | 'BREW_QUOTE' | 'QUOTES_LIST' | 'BEER_WAREHOUSE' | 'SALES_ORDER' | 'BEER_INVENTORY' | 'SALES_TREND';
+import { BeerPriceListView } from './components/BeerPriceListView';
+
+export type View = 'HOME' | 'MOVEMENTS' | 'WAREHOUSE' | 'BREW_PAGE' | 'CANTINA' | 'DATABASE' | 'COST_ANALYSIS' | 'PRODUCTION_TREND' | 'BREW_QUOTE' | 'QUOTES_LIST' | 'BEER_WAREHOUSE' | 'SALES_ORDER' | 'BEER_INVENTORY' | 'SALES_TREND' | 'BEER_PRICE_LIST';
 
 export default function App() {
     const [years, setYears] = useState<string[]>([]);
@@ -299,6 +301,8 @@ export default function App() {
                 return <BeerInventoryView key={`${selectedYear}-${refreshKey}`} selectedYear={selectedYear} onRefresh={handleRefresh} />;
             case 'SALES_TREND':
                 return <SalesTrendView key={`${selectedYear}-${refreshKey}`} selectedYear={selectedYear} />;
+            case 'BEER_PRICE_LIST':
+                return <BeerPriceListView key={`${selectedYear}-${refreshKey}`} selectedYear={selectedYear} />;
             default:
                 return <Home key={refreshKey} warehouseStatus={warehouseStatus} selectedYear={selectedYear} onRefresh={handleRefresh} />;
         }

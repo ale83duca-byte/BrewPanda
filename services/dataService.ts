@@ -9,6 +9,8 @@ const getDefaultData = (): BreweryData => ({
     BEER_MOVEMENTS: [],
     SALES_ORDERS: [],
     BEER_INVENTORY_CHECKS: [],
+    BEER_PRICE_LIST: [],
+    CLIENT_OFFERS: [],
 });
 
 export const getBreweryData = async (year: string): Promise<BreweryData | undefined> => {

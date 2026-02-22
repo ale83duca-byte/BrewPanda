@@ -10,6 +10,7 @@ import type { View } from '../App';
 interface RightSidebarProps {
     selectedYear: string;
     refreshKey: number;
+    // eslint-disable-next-line no-unused-vars
     onNavigate: (view: View) => void;
     onOpenCoefficients: () => void;
 }
@@ -89,7 +90,13 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ selectedYear, refres
                         placeholder={t('rightSidebar.priceDbSearchPlaceholder')}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full bg-brew-dark-secondary p-1.5 rounded-md text-sm focus:ring-2 focus:ring-brew-accent focus:outline-none"
+                        className="w-full bg-brew-dark-secondary p-1.5 rounded-md text-sm focus:ring-2 focus:ring-brew-accent focus:outline-none mb-4"
+                    />
+                    <Button 
+                        onClick={() => onNavigate('BEER_PRICE_LIST')} 
+                        icon={null} 
+                        label="LISTINO PREZZI BIRRE FINITE" 
+                        className="bg-brew-purple py-2 text-xs" 
                     />
                 </div>
                 
