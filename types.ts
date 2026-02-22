@@ -96,9 +96,14 @@ export interface FermenterConfig {
   capacita: number;
 }
 
+// Start Cliente Interface
 export interface Cliente {
   id: string;
   nome: string;
+  partitaIva?: string;
+  sedeSociale?: string;
+  numeroTelefono?: string;
+  ragioneSociale?: string;
 }
 
 export interface RecipeIngredient {

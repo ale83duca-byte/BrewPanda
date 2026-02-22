@@ -193,6 +193,8 @@ export const CostAnalysisView: React.FC<CostAnalysisViewProps> = ({ selectedYear
             const config = CONFIG_PACKAGING[formato];
             if (!config || config.litriUnit <= 0) return null;
 
+            const totalKegs = lottoPackaging.filter(p => p.FORMATO === formato).reduce((sum, p) => sum + p.QTA_UNITA, 0);
+
             const isSteelKeg = formato.toUpperCase().includes('ACCIAIO');
             let containerUnitCost = 0;
 
@@ -208,6 +210,7 @@ export const CostAnalysisView: React.FC<CostAnalysisViewProps> = ({ selectedYear
 
             return {
                 formato,
+                totalKegs,
                 beerCostPerLiter: analysisSummary.beerPricePerLiter,
                 containerCostPerLiter,
                 finalPricePerLiter
@@ -230,6 +233,10 @@ export const CostAnalysisView: React.FC<CostAnalysisViewProps> = ({ selectedYear
             const totalBottles = lottoPackaging.filter(p => p.FORMATO === formato).reduce((sum, p) => sum + p.QTA_UNITA, 0);
             if (totalBottles === 0) return null;
 
+            const totalCartons = (config.pezziPerCartone && config.pezziPerCartone > 0) 
+                ? Math.ceil(totalBottles / config.pezziPerCartone) 
+                : 0;
+
             const beerCost = analysisSummary.beerPricePerLiter * config.litriUnit;
             
             const bottlePriceItem = priceDb.find(p => p.NOME === config.nomeInvCont);
@@ -247,7 +254,7 @@ export const CostAnalysisView: React.FC<CostAnalysisViewProps> = ({ selectedYear
             const totalCostForFormat = finalPricePerBottle * totalBottles;
 
             return {
-                formato, totalBottles, beerCost, bottleCost, capPrice,
+                formato, totalBottles, totalCartons, beerCost, bottleCost, capPrice,
                 cartonCostPerBottle, labelCost, finalPricePerBottle, totalCostForFormat
             };
         }).filter(Boolean);
@@ -418,14 +425,16 @@ export const CostAnalysisView: React.FC<CostAnalysisViewProps> = ({ selectedYear
                             <table className="w-full text-sm">
                                 <thead><tr className="text-left text-slate-400">
                                     <th className="py-1 px-2 font-medium">{t('costAnalysis.packagingFormat')}</th>
+                                    <th className="py-1 px-2 font-medium text-right">{t('costAnalysis.kegCount')}</th>
                                     <th className="py-1 px-2 font-medium text-right">{t('costAnalysis.beerCostPerLiter')}</th>
                                     <th className="py-1 px-2 font-medium text-right">{t('costAnalysis.containerCostPerLiter')}</th>
                                     <th className="py-1 px-2 font-medium text-right">{t('costAnalysis.finalPricePerLiter')}</th>
                                 </tr></thead>
                                 <tbody>
-                                    {packagingAnalysis.kegs.map((item, index) => item && (
+                                    {packagingAnalysis.kegs.map((item: any, index: number) => item && (
                                         <tr key={index} className="border-t border-slate-700/50">
                                             <td className="py-2 px-2 font-bold">{item.formato}</td>
+                                            <td className="py-2 px-2 text-right">{item.totalKegs}</td>
                                             <td className="py-2 px-2 text-right">€{item.beerCostPerLiter.toFixed(3)}</td>
                                             <td className="py-2 px-2 text-right">€{item.containerCostPerLiter.toFixed(3)}</td>
                                             <td className="py-2 px-2 text-right font-bold text-lg text-brew-accent">€{item.finalPricePerLiter.toFixed(3)}</td>
@@ -451,6 +460,7 @@ export const CostAnalysisView: React.FC<CostAnalysisViewProps> = ({ selectedYear
                                 <thead><tr className="text-left text-slate-400">
                                     <th className="p-1">{t('costAnalysis.bottleFormat')}</th>
                                     <th className="p-1 text-right">{t('costAnalysis.bottleCount')}</th>
+                                    <th className="p-1 text-right">{t('costAnalysis.cartonCount')}</th>
                                     <th className="p-1 text-right">{t('costAnalysis.beerCostPerBottle')}</th>
                                     <th className="p-1 text-right">{t('costAnalysis.containerCostPerBottle')}</th>
                                     <th className="p-1 text-right">{t('costAnalysis.capCostPerBottle')}</th>
@@ -460,10 +470,11 @@ export const CostAnalysisView: React.FC<CostAnalysisViewProps> = ({ selectedYear
                                     <th className="p-1 text-right text-base">{t('costAnalysis.totalPriceForFormat')}</th>
                                 </tr></thead>
                                 <tbody>
-                                    {packagingAnalysis.bottles.map((item, index) => item && (
+                                    {packagingAnalysis.bottles.map((item: any, index: number) => item && (
                                         <tr key={index} className="border-t border-slate-700/50">
                                             <td className="p-2 font-bold">{item.formato}</td>
                                             <td className="p-2 text-right">{item.totalBottles}</td>
+                                            <td className="p-2 text-right">{item.totalCartons}</td>
                                             <td className="p-2 text-right">€{item.beerCost.toFixed(3)}</td>
                                             <td className="p-2 text-right">€{item.bottleCost.toFixed(3)}</td>
                                             <td className="p-2 text-right">€{item.capPrice.toFixed(3)}</td>
@@ -480,6 +491,10 @@ export const CostAnalysisView: React.FC<CostAnalysisViewProps> = ({ selectedYear
                 )}
                 
                 {analysisSummary && <div className="space-y-4">
+                    <div className="bg-brew-dark-secondary p-4 rounded-lg text-right border border-brew-accent">
+                        <h3 className="text-xl font-bold text-brew-accent">{t('costAnalysis.totalPackagedLiters')}</h3>
+                        <p className="text-5xl font-extrabold text-white">{analysisSummary.totalLitersPackaged.toFixed(0)} L</p>
+                    </div>
                     <div className="bg-brew-accent text-brew-dark p-4 rounded-lg text-right">
                         <h3 className="text-xl font-bold">{t('costAnalysis.grandTotal')}</h3>
                         <p className="text-4xl font-extrabold">€{analysisSummary.grandTotal.toFixed(2)}</p>

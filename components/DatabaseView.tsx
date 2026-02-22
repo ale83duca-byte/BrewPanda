@@ -130,7 +130,7 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({ selectedYear }) => {
     const [clienti, setClienti] = useState<Cliente[]>([]);
     const [birre, setBirre] = useState<Birra[]>([]);
     const [warehouseDb, setWarehouseDb] = useState<DatabaseItem[]>([]);
-    const [newClienteName, setNewClienteName] = useState('');
+    const [newCliente, setNewCliente] = useState<Partial<Cliente>>({ nome: '', partitaIva: '', sedeSociale: '', numeroTelefono: '', ragioneSociale: '' });
     const [confirmState, setConfirmState] = useState<{ isOpen: boolean; type: 'cliente' | 'birra' | null; id: string | null; }>({ isOpen: false, type: null, id: null });
     const { showToast } = useToast();
 
@@ -150,25 +150,29 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({ selectedYear }) => {
     }, [loadData]);
 
     const addCliente = async () => {
-        if (newClienteName.trim() === '') {
+        if (!newCliente.nome || newCliente.nome.trim() === '') {
             showToast("Il nome del cliente non può essere vuoto.", 'error');
             return;
         }
         
         const currentClienti = await getSheetData(selectedYear, 'CLIENTI') as Cliente[];
-        if (currentClienti.some(c => c.nome.toLowerCase() === newClienteName.trim().toLowerCase())) {
+        if (currentClienti.some(c => c.nome.toLowerCase() === newCliente.nome!.trim().toLowerCase())) {
             showToast("Esiste già un cliente con questo nome.", 'error');
             return;
         }
         
-        const newCliente: Cliente = {
+        const clienteToSave: Cliente = {
             id: `cli_${Date.now()}`,
-            nome: newClienteName.trim(),
+            nome: newCliente.nome.trim(),
+            partitaIva: newCliente.partitaIva?.trim() || undefined,
+            sedeSociale: newCliente.sedeSociale?.trim() || undefined,
+            numeroTelefono: newCliente.numeroTelefono?.trim() || undefined,
+            ragioneSociale: newCliente.ragioneSociale?.trim() || undefined,
         };
 
-        await saveDataToSheet(selectedYear, 'CLIENTI', [...currentClienti, newCliente]);
+        await saveDataToSheet(selectedYear, 'CLIENTI', [...currentClienti, clienteToSave]);
         await loadData();
-        setNewClienteName('');
+        setNewCliente({ nome: '', partitaIva: '', sedeSociale: '', numeroTelefono: '', ragioneSociale: '' });
         showToast("Cliente aggiunto con successo!", 'success');
     };
 
@@ -224,10 +228,13 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({ selectedYear }) => {
 
             <div className="bg-brew-dark-secondary p-4 rounded-lg shadow-lg">
                 <h2 className="text-xl font-bold mb-4">Aggiungi Nuovo Cliente</h2>
-                <div className="flex gap-4 items-end">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-end">
                     <div className="flex-grow">
-                        <label className="text-xs">Nome Cliente</label>
-                        <input type="text" value={newClienteName} onChange={e => setNewClienteName(e.target.value)} onKeyDown={e => e.key === 'Enter' && addCliente()} className="w-full bg-brew-dark p-2 rounded-md border border-slate-600"/>
+                        <Field label="Nome Cliente"><Input value={newCliente.nome || ''} onChange={e => setNewCliente(prev => ({ ...prev, nome: e.target.value }))} onKeyDown={e => e.key === 'Enter' && addCliente()} required/></Field>
+                        <Field label="Ragione Sociale"><Input value={newCliente.ragioneSociale || ''} onChange={e => setNewCliente(prev => ({ ...prev, ragioneSociale: e.target.value }))} onKeyDown={e => e.key === 'Enter' && addCliente()}/></Field>
+                        <Field label="Partita IVA"><Input value={newCliente.partitaIva || ''} onChange={e => setNewCliente(prev => ({ ...prev, partitaIva: e.target.value }))} onKeyDown={e => e.key === 'Enter' && addCliente()}/></Field>
+                        <Field label="Sede Sociale"><Input value={newCliente.sedeSociale || ''} onChange={e => setNewCliente(prev => ({ ...prev, sedeSociale: e.target.value }))} onKeyDown={e => e.key === 'Enter' && addCliente()}/></Field>
+                        <Field label="Numero di Telefono"><Input value={newCliente.numeroTelefono || ''} onChange={e => setNewCliente(prev => ({ ...prev, numeroTelefono: e.target.value }))} onKeyDown={e => e.key === 'Enter' && addCliente()}/></Field>
                     </div>
                     <button onClick={addCliente} className="bg-brew-green text-white font-bold py-2 px-4 rounded-md flex items-center gap-2"><PlusIcon className="w-5 h-5"/> Aggiungi Cliente</button>
                 </div>
@@ -238,6 +245,10 @@ export const DatabaseView: React.FC<DatabaseViewProps> = ({ selectedYear }) => {
                     <div key={cliente.id} className="bg-brew-dark-secondary p-4 rounded-lg shadow-lg">
                         <div className="flex justify-between items-center mb-4 border-b border-slate-600 pb-2">
                             <h3 className="text-2xl font-bold text-brew-accent">{cliente.nome}</h3>
+                            {cliente.ragioneSociale && <p className="text-sm text-slate-400">Ragione Sociale: {cliente.ragioneSociale}</p>}
+                            {cliente.partitaIva && <p className="text-sm text-slate-400">P.IVA: {cliente.partitaIva}</p>}
+                            {cliente.sedeSociale && <p className="text-sm text-slate-400">Sede: {cliente.sedeSociale}</p>}
+                            {cliente.numeroTelefono && <p className="text-sm text-slate-400">Tel: {cliente.numeroTelefono}</p>}
                             <button onClick={() => handleDeleteRequest('cliente', cliente.id)} className="text-red-500 hover:text-red-400"><TrashIcon className="w-6 h-6"/></button>
                         </div>
                         
