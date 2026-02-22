@@ -57,8 +57,7 @@ const BeerRecipeModal: React.FC<{
         }
 
         const ricettaToSave = ricetta
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            .map(({ uiId, ...rest }) => ({ ...rest, qta: parseFloat(String(rest.qta).replace(',', '.')) || 0 }))
+            .map(({ uiId: _uiId, ...rest }) => ({ ...rest, qta: parseFloat(String(rest.qta).replace(',', '.')) || 0 }))
             .filter(r => r.nome && r.qta > 0);
 
         const birraToSave: Birra = {
@@ -131,7 +130,7 @@ const EditClientModal: React.FC<{
     isOpen: boolean;
     onClose: () => void;
     clientToEdit: Cliente | null;
-    onSave: (_client: Cliente) => Promise<void>;
+    onSave: (client: Cliente) => Promise<void>;
 }> = ({ isOpen, onClose, clientToEdit, onSave }) => {
     const [formData, setFormData] = useState<Cliente | null>(null);
 

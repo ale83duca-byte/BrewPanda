@@ -32,6 +32,7 @@ export const SalesOrderView: React.FC<SalesOrderViewProps> = ({ selectedYear, on
     const [selectedClient, setSelectedClient] = useState('');
     const [orderDate, setOrderDate] = useState(new Date().toISOString().slice(0, 10));
     const [orderItems, setOrderItems] = useState<{ beerName: string; lotto: string; format: string; quantity: string; customBeerName: string }[]>([{ beerName: '', lotto: '', format: '', quantity: '', customBeerName: '' }]);
+    const [editingOrder, setEditingOrder] = useState<SalesOrder | null>(null);
 
     const loadData = useCallback(async () => {
         setIsLoading(true);
@@ -136,25 +137,77 @@ export const SalesOrderView: React.FC<SalesOrderViewProps> = ({ selectedYear, on
     };
 
 
+    const handleEditOrder = (order: SalesOrder) => {
+        setEditingOrder(order);
+        setSelectedClient(order.client);
+        // Convert DD/MM/YYYY to YYYY-MM-DD for input type="date"
+        const [day, month, year] = order.date.split('/');
+        setOrderDate(`${year}-${month}-${day}`);
+        setOrderItems(order.items.map(item => ({
+            beerName: item.beerName,
+            lotto: item.lotto,
+            format: item.format,
+            quantity: String(item.quantity),
+            customBeerName: item.customBeerName || ''
+        })));
+        setView('new');
+    };
+
     const handleSaveOrder = async () => {
         if (!selectedClient || orderItems.some(i => !i.beerName || !i.lotto || !i.format || !i.quantity)) {
             showToast("Cliente e tutti i campi degli articoli sono obbligatori.", 'error'); return;
         }
 
-        const newMovements: BeerMovement[] = [];
-        const orderId = `ORD_${Date.now()}`;
+        const orderId = editingOrder ? editingOrder.id : `ORD_${Date.now()}`;
         const [year, month, day] = orderDate.split('-');
         const formattedDate = `${day}/${month}/${year}`;
 
-        for (const item of orderItems) {
-            const quantityToShip = parseInt(item.quantity);
-            if (isNaN(quantityToShip) || quantityToShip <= 0) continue;
+        // Robust Stock Validation
+        const stockCheckMap = new Map<string, { required: number, available: number, refund: number }>();
 
-            const availableStock = getAvailableQuantity(item.beerName, item.lotto, item.format);
-            if (quantityToShip > availableStock) {
-                showToast(`Stock insufficiente per ${item.beerName} (Lotto: ${item.lotto}, ${item.format}). Disponibili: ${availableStock}, Richiesti: ${quantityToShip}`, 'error');
-                return;
+        // 1. Calculate Required Quantities
+        for (const item of orderItems) {
+            const qty = parseInt(item.quantity);
+            if (isNaN(qty) || qty <= 0) continue;
+            const key = `${item.beerName}|${item.lotto}|${item.format}`;
+            const current = stockCheckMap.get(key) || { required: 0, available: 0, refund: 0 };
+            current.required += qty;
+            stockCheckMap.set(key, current);
+        }
+
+        // 2. Calculate Available and Refund Quantities
+        for (const key of stockCheckMap.keys()) {
+            const [beerName, lotto, format] = key.split('|');
+            const available = getAvailableQuantity(beerName, lotto, format);
+            
+            let refund = 0;
+            if (editingOrder) {
+                editingOrder.items.forEach(i => {
+                    if (i.beerName === beerName && i.lotto === lotto && i.format === format) {
+                        refund += i.quantity;
+                    }
+                });
             }
+            
+            const current = stockCheckMap.get(key)!;
+            current.available = available;
+            current.refund = refund;
+            stockCheckMap.set(key, current);
+        }
+
+        // 3. Validate
+        for (const [key, data] of stockCheckMap.entries()) {
+            const [beerName, lotto, format] = key.split('|');
+            if (data.required > (data.available + data.refund)) {
+                 showToast(`Stock insufficiente per ${beerName} (Lotto: ${lotto}, ${format}). Disponibili: ${data.available + data.refund}, Richiesti: ${data.required}`, 'error');
+                 return;
+            }
+        }
+
+        const newMovements: BeerMovement[] = [];
+        for (const item of orderItems) {
+             const quantityToShip = parseInt(item.quantity);
+             if (isNaN(quantityToShip) || quantityToShip <= 0) continue;
 
             // 1. Movement OUT from ALVERESE (Sale)
             newMovements.push({
@@ -187,15 +240,23 @@ export const SalesOrderView: React.FC<SalesOrderViewProps> = ({ selectedYear, on
             id: orderId,
             date: formattedDate,
             client: selectedClient,
-            // FIX: Ensure quantity is a string before parsing to avoid type errors.
             items: orderItems.map(i => ({...i, quantity: parseInt(String(i.quantity))})).filter(i => i.quantity > 0)
         };
         
         const data = await getBreweryData(selectedYear);
         if (!data) return;
         
-        const updatedOrders = [...(data.SALES_ORDERS || []), newOrder];
-        const updatedMovements = [...(data.BEER_MOVEMENTS || []), ...newMovements];
+        let updatedOrders = data.SALES_ORDERS || [];
+        let updatedMovements = data.BEER_MOVEMENTS || [];
+
+        if (editingOrder) {
+            // Remove old order and its movements
+            updatedOrders = updatedOrders.filter(o => o.id !== editingOrder.id);
+            updatedMovements = updatedMovements.filter(m => m.relatedDocId !== editingOrder.id);
+        }
+
+        updatedOrders.push(newOrder);
+        updatedMovements.push(...newMovements);
         
         await saveDataToSheet(selectedYear, 'SALES_ORDERS', updatedOrders);
         await saveDataToSheet(selectedYear, 'BEER_MOVEMENTS', updatedMovements);
@@ -206,6 +267,7 @@ export const SalesOrderView: React.FC<SalesOrderViewProps> = ({ selectedYear, on
         // Reset form
         setSelectedClient('');
         setOrderItems([{ beerName: '', lotto: '', format: '', quantity: '', customBeerName: '' }]);
+        setEditingOrder(null);
     };
 
     if(isLoading) return <p>Caricamento...</p>
@@ -268,42 +330,60 @@ export const SalesOrderView: React.FC<SalesOrderViewProps> = ({ selectedYear, on
         );
     }
     
+    const groupedOrders = useMemo(() => {
+        const groups: Record<string, SalesOrder[]> = {};
+        orders.forEach(order => {
+            if (!groups[order.client]) groups[order.client] = [];
+            groups[order.client].push(order);
+        });
+        return groups;
+    }, [orders]);
+
     return (
         <div className="bg-brew-dark-secondary p-4 rounded-lg shadow-lg">
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-bold text-brew-accent">Dashboard Commissioni</h2>
-                <button onClick={() => setView('new')} className="flex items-center gap-2 bg-brew-green text-white font-bold py-2 px-4 rounded-md hover:bg-opacity-90">
+                <button onClick={() => { setEditingOrder(null); setSelectedClient(''); setOrderItems([{ beerName: '', lotto: '', format: '', quantity: '', customBeerName: '' }]); setView('new'); }} className="flex items-center gap-2 bg-brew-green text-white font-bold py-2 px-4 rounded-md hover:bg-opacity-90">
                     <PlusIcon className="w-5 h-5" /> Nuova Commissione
                 </button>
             </div>
-            <div className="overflow-x-auto max-h-[70vh]">
-                <table className="w-full text-sm text-left text-gray-300">
-                     <thead className="text-xs text-brew-dark uppercase bg-brew-accent sticky top-0">
-                        <tr>
-                            <th className="px-3 py-3">Data</th>
-                            <th className="px-3 py-3">Cliente</th>
-                            <th className="px-3 py-3">Articoli</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {orders.map(order => (
-                             <tr key={order.id} className="border-b border-slate-700">
-                                <td className="px-3 py-2 font-semibold">{order.date}</td>
-                                <td className="px-3 py-2">{order.client}</td>
-                                <td className="px-3 py-2">
-                                    <ul className="text-xs list-disc pl-4">
-                                        {order.items.map((item, i) => (
-                                            <li key={i}>
-                                                {item.quantity} x {item.customBeerName ? `${item.customBeerName} (ex ${item.beerName})` : item.beerName} ({item.format}) - Lotto: {item.lotto}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
-                 {orders.length === 0 && <p className="text-center text-slate-400 mt-8 py-4">Nessuna commissione d'ordine trovata.</p>}
+            <div className="overflow-x-auto max-h-[70vh] space-y-6">
+                {Object.keys(groupedOrders).sort().map(clientName => (
+                    <div key={clientName} className="bg-brew-dark p-4 rounded-lg">
+                        <h3 className="text-xl font-bold text-white mb-3 border-b border-slate-600 pb-2">{clientName}</h3>
+                        <table className="w-full text-sm text-left text-gray-300">
+                            <thead className="text-xs text-brew-dark uppercase bg-brew-accent">
+                                <tr>
+                                    <th className="px-3 py-3 rounded-tl-md">Data</th>
+                                    <th className="px-3 py-3">Articoli</th>
+                                    <th className="px-3 py-3 rounded-tr-md">Azioni</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {groupedOrders[clientName].map(order => (
+                                    <tr key={order.id} className="border-b border-slate-700 last:border-0">
+                                        <td className="px-3 py-2 font-semibold w-32">{order.date}</td>
+                                        <td className="px-3 py-2">
+                                            <ul className="text-xs list-disc pl-4 space-y-1">
+                                                {order.items.map((item, i) => (
+                                                    <li key={i}>
+                                                        {item.quantity} x {item.customBeerName ? `${item.customBeerName} (ex ${item.beerName})` : item.beerName} ({item.format}) - Lotto: {item.lotto}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </td>
+                                        <td className="px-3 py-2 w-24">
+                                            <button onClick={() => handleEditOrder(order)} className="text-brew-blue hover:text-blue-400 font-semibold text-xs border border-brew-blue px-2 py-1 rounded">
+                                                Modifica
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                ))}
+                {orders.length === 0 && <p className="text-center text-slate-400 mt-8 py-4">Nessuna commissione d'ordine trovata.</p>}
             </div>
         </div>
     );
