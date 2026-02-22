@@ -31,7 +31,7 @@ export const SalesOrderView: React.FC<SalesOrderViewProps> = ({ selectedYear, on
     
     const [selectedClient, setSelectedClient] = useState('');
     const [orderDate, setOrderDate] = useState(new Date().toISOString().slice(0, 10));
-    const [orderItems, setOrderItems] = useState<{ beerName: string; format: string; quantity: string }[]>([{ beerName: '', format: '', quantity: '' }]);
+    const [orderItems, setOrderItems] = useState<{ beerName: string; lotto: string; format: string; quantity: string; customBeerName: string }[]>([{ beerName: '', lotto: '', format: '', quantity: '', customBeerName: '' }]);
 
     const loadData = useCallback(async () => {
         setIsLoading(true);
@@ -92,31 +92,52 @@ export const SalesOrderView: React.FC<SalesOrderViewProps> = ({ selectedYear, on
 
     useEffect(() => { loadData(); }, [loadData]);
 
-    const handleItemChange = (index: number, field: 'beerName' | 'format' | 'quantity', value: string) => {
+    const handleItemChange = (index: number, field: 'beerName' | 'lotto' | 'format' | 'quantity' | 'customBeerName', value: string) => {
         const newItems = [...orderItems];
         newItems[index] = { ...newItems[index], [field]: value };
-        if (field === 'beerName') newItems[index].format = '';
+        if (field === 'beerName') {
+            newItems[index].lotto = '';
+            newItems[index].format = '';
+            newItems[index].customBeerName = value;
+        }
+        if (field === 'lotto') {
+            newItems[index].format = '';
+        }
         setOrderItems(newItems);
     };
-    const addItem = () => setOrderItems([...orderItems, { beerName: '', format: '', quantity: '' }]);
+    const addItem = () => setOrderItems([...orderItems, { beerName: '', lotto: '', format: '', quantity: '', customBeerName: '' }]);
     const removeItem = (index: number) => setOrderItems(orderItems.filter((_, i) => i !== index));
 
-    const availableBeers = useMemo(() => beerStock[selectedClient] ? Object.keys(beerStock[selectedClient]) : [], [selectedClient, beerStock]);
-    const availableFormats = (beerName: string) => {
-        if (!selectedClient || !beerName || !beerStock[selectedClient] || !beerStock[selectedClient][beerName]) return [];
-        const formats = beerStock[selectedClient][beerName].map(item => item.formato);
+    // Filter beers by "ALVERESE" client
+    const availableBeers = useMemo(() => {
+        const alvereseStock = beerStock["ALVERESE"];
+        return alvereseStock ? Object.keys(alvereseStock) : [];
+    }, [beerStock]);
+
+    const availableLottos = (beerName: string) => {
+        if (!beerName || !beerStock["ALVERESE"] || !beerStock["ALVERESE"][beerName]) return [];
+        const lottos = beerStock["ALVERESE"][beerName].map(item => item.lotto);
+        return [...new Set(lottos)];
+    }
+
+    const availableFormats = (beerName: string, lotto: string) => {
+        if (!beerName || !lotto || !beerStock["ALVERESE"] || !beerStock["ALVERESE"][beerName]) return [];
+        const formats = beerStock["ALVERESE"][beerName]
+            .filter(item => item.lotto === lotto)
+            .map(item => item.formato);
         return [...new Set(formats)];
     };
-     const getAvailableQuantity = (beerName: string, format: string) => {
-        if (!selectedClient || !beerName || !format) return 0;
-        return beerStock[selectedClient]?.[beerName]
-            ?.filter(item => item.formato === format)
+
+     const getAvailableQuantity = (beerName: string, lotto: string, format: string) => {
+        if (!beerName || !lotto || !format) return 0;
+        return beerStock["ALVERESE"]?.[beerName]
+            ?.filter(item => item.lotto === lotto && item.formato === format)
             .reduce((sum, item) => sum + item.quantita, 0) || 0;
     };
 
 
     const handleSaveOrder = async () => {
-        if (!selectedClient || orderItems.some(i => !i.beerName || !i.format || !i.quantity)) {
+        if (!selectedClient || orderItems.some(i => !i.beerName || !i.lotto || !i.format || !i.quantity)) {
             showToast("Cliente e tutti i campi degli articoli sono obbligatori.", 'error'); return;
         }
 
@@ -129,44 +150,37 @@ export const SalesOrderView: React.FC<SalesOrderViewProps> = ({ selectedYear, on
             const quantityToShip = parseInt(item.quantity);
             if (isNaN(quantityToShip) || quantityToShip <= 0) continue;
 
-            const availableStock = getAvailableQuantity(item.beerName, item.format);
+            const availableStock = getAvailableQuantity(item.beerName, item.lotto, item.format);
             if (quantityToShip > availableStock) {
-                showToast(`Stock insufficiente per ${item.beerName} (${item.format}). Disponibili: ${availableStock}, Richiesti: ${quantityToShip}`, 'error');
+                showToast(`Stock insufficiente per ${item.beerName} (Lotto: ${item.lotto}, ${item.format}). Disponibili: ${availableStock}, Richiesti: ${quantityToShip}`, 'error');
                 return;
             }
 
-            // FIFO logic based on expiration date
-            // Fix: Safe access to beerStock and explicit sorting params
-            const clientBeerStock = beerStock[selectedClient];
-            if (!clientBeerStock) continue;
-            const itemsInStock = clientBeerStock[item.beerName];
-            if (!itemsInStock) continue;
+            // 1. Movement OUT from ALVERESE (Sale)
+            newMovements.push({
+                id: `MOV_${Date.now()}_${newMovements.length}_OUT`,
+                data: formattedDate,
+                type: 'SALE',
+                cliente: "ALVERESE", // The stock is deducted from ALVERESE
+                nomeBirra: item.beerName,
+                lotto: item.lotto,
+                formato: item.format,
+                quantita: -quantityToShip,
+                relatedDocId: orderId
+            });
 
-            const lotsForProduct = itemsInStock
-                .filter(s => s.formato === item.format && s.quantita > 0)
-                .sort((a: LocalBeerStockItem, b: LocalBeerStockItem) => {
-                    const dateAStr = (a.dataScadenza || '01/01/1900').split('/').reverse().join('-');
-                    const dateBStr = (b.dataScadenza || '01/01/1900').split('/').reverse().join('-');
-                    return new Date(dateAStr).getTime() - new Date(dateBStr).getTime();
-                });
-
-            let remainingToShip = quantityToShip;
-            for (const lot of lotsForProduct) {
-                if (remainingToShip <= 0) break;
-                const qtyFromThisLot = Math.min(remainingToShip, lot.quantita);
-                newMovements.push({
-                    id: `MOV_${Date.now()}_${newMovements.length}`,
-                    data: formattedDate,
-                    type: 'SALE',
-                    cliente: selectedClient,
-                    nomeBirra: item.beerName,
-                    lotto: lot.lotto,
-                    formato: item.format,
-                    quantita: -qtyFromThisLot,
-                    relatedDocId: orderId
-                });
-                remainingToShip -= qtyFromThisLot;
-            }
+            // 2. Movement IN to Selected Client (Purchase)
+            newMovements.push({
+                id: `MOV_${Date.now()}_${newMovements.length}_IN`,
+                data: formattedDate,
+                type: 'PURCHASE',
+                cliente: selectedClient,
+                nomeBirra: item.customBeerName || item.beerName,
+                lotto: item.lotto,
+                formato: item.format,
+                quantita: quantityToShip,
+                relatedDocId: orderId
+            });
         }
         
         const newOrder: SalesOrder = {
@@ -191,7 +205,7 @@ export const SalesOrderView: React.FC<SalesOrderViewProps> = ({ selectedYear, on
         setView('dashboard');
         // Reset form
         setSelectedClient('');
-        setOrderItems([{ beerName: '', format: '', quantity: '' }]);
+        setOrderItems([{ beerName: '', lotto: '', format: '', quantity: '', customBeerName: '' }]);
     };
 
     if(isLoading) return <p>Caricamento...</p>
@@ -215,17 +229,26 @@ export const SalesOrderView: React.FC<SalesOrderViewProps> = ({ selectedYear, on
                      <h3 className="text-lg font-semibold mb-2">Articoli</h3>
                      <div className="space-y-2">
                         {orderItems.map((item, index) => (
-                            <div key={index} className="grid grid-cols-[2fr,1fr,auto,auto] gap-2 items-end">
+                            <div key={index} className="grid grid-cols-[1.5fr,1.5fr,1fr,1fr,0.5fr,auto] gap-2 items-end">
                                 <Field label={index === 0 ? "Birra" : ""}>
                                     <select value={item.beerName} onChange={e => handleItemChange(index, 'beerName', e.target.value)} className="w-full bg-brew-dark p-2 rounded-md border border-slate-600" disabled={!selectedClient}>
                                         <option value="">Seleziona...</option>
                                         {availableBeers.map(b => <option key={b} value={b}>{b}</option>)}
                                     </select>
                                 </Field>
-                                <Field label={index === 0 ? "Formato" : ""}>
-                                    <select value={item.format} onChange={e => handleItemChange(index, 'format', e.target.value)} className="w-full bg-brew-dark p-2 rounded-md border border-slate-600" disabled={!item.beerName}>
+                                <Field label={index === 0 ? "Nome Cliente" : ""}>
+                                    <input type="text" value={item.customBeerName} onChange={e => handleItemChange(index, 'customBeerName', e.target.value)} className="w-full bg-brew-dark p-2 rounded-md border border-slate-600" placeholder={item.beerName} disabled={!item.beerName} />
+                                </Field>
+                                <Field label={index === 0 ? "Lotto" : ""}>
+                                    <select value={item.lotto} onChange={e => handleItemChange(index, 'lotto', e.target.value)} className="w-full bg-brew-dark p-2 rounded-md border border-slate-600" disabled={!item.beerName}>
                                         <option value="">Seleziona...</option>
-                                        {availableFormats(item.beerName).map(f => <option key={f} value={f}>{f} (Disp: {getAvailableQuantity(item.beerName, f)})</option>)}
+                                        {availableLottos(item.beerName).map(l => <option key={l} value={l}>{l}</option>)}
+                                    </select>
+                                </Field>
+                                <Field label={index === 0 ? "Formato" : ""}>
+                                    <select value={item.format} onChange={e => handleItemChange(index, 'format', e.target.value)} className="w-full bg-brew-dark p-2 rounded-md border border-slate-600" disabled={!item.lotto}>
+                                        <option value="">Seleziona...</option>
+                                        {availableFormats(item.beerName, item.lotto).map(f => <option key={f} value={f}>{f} (Disp: {getAvailableQuantity(item.beerName, item.lotto, f)})</option>)}
                                     </select>
                                 </Field>
                                 <Field label={index === 0 ? "Quantità" : ""}>
@@ -269,7 +292,11 @@ export const SalesOrderView: React.FC<SalesOrderViewProps> = ({ selectedYear, on
                                 <td className="px-3 py-2">{order.client}</td>
                                 <td className="px-3 py-2">
                                     <ul className="text-xs list-disc pl-4">
-                                        {order.items.map((item, i) => <li key={i}>{item.quantity} x {item.beerName} ({item.format})</li>)}
+                                        {order.items.map((item, i) => (
+                                            <li key={i}>
+                                                {item.quantity} x {item.customBeerName ? `${item.customBeerName} (ex ${item.beerName})` : item.beerName} ({item.format}) - Lotto: {item.lotto}
+                                            </li>
+                                        ))}
                                     </ul>
                                 </td>
                             </tr>

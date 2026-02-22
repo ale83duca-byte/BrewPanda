@@ -41,6 +41,7 @@ export const BeerWarehouseView: React.FC<BeerWarehouseViewProps> = ({ selectedYe
                 const key = `${item.cliente}|${item.nomeBirra}|${item.lotto}|${item.formato}`;
                  stockMap.set(key, { ...item, quantita: item.quantita, dataScadenza: item.dataScadenza });
             });
+            const lottoExpiration = new Map<string, string>();
             (data.CONFEZIONAMENTO || []).forEach(pkg => {
                  const info = lottoInfo.get(pkg.LOTTO_PROD);
                  if (info) {
@@ -51,6 +52,7 @@ export const BeerWarehouseView: React.FC<BeerWarehouseViewProps> = ({ selectedYe
                     } else {
                         stockMap.set(key, { cliente: info.clientName, nomeBirra: info.beerName, lotto: pkg.LOTTO_PROD, formato: pkg.FORMATO, quantita: pkg.QTA_UNITA, dataScadenza: pkg.DATA_SCADENZA });
                     }
+                    lottoExpiration.set(pkg.LOTTO_PROD, pkg.DATA_SCADENZA);
                  }
             });
             (data.BEER_MOVEMENTS || []).forEach(mov => {
@@ -58,6 +60,16 @@ export const BeerWarehouseView: React.FC<BeerWarehouseViewProps> = ({ selectedYe
                 const existing = stockMap.get(key);
                 if (existing) {
                     existing.quantita += mov.quantita;
+                } else if (mov.quantita > 0) {
+                    // If it's a new item (e.g. from a PURCHASE), add it to the map
+                    stockMap.set(key, { 
+                        cliente: mov.cliente, 
+                        nomeBirra: mov.nomeBirra, 
+                        lotto: mov.lotto, 
+                        formato: mov.formato, 
+                        quantita: mov.quantita, 
+                        dataScadenza: lottoExpiration.get(mov.lotto) || 'N/A'
+                    });
                 }
             });
 

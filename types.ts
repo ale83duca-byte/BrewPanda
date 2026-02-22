@@ -186,19 +186,21 @@ export interface InitialBeerStock {
 export interface BeerMovement {
     id: string;
     data: string;
-    type: 'SALE' | 'ADJUSTMENT'; // Vendita o Rettifica Inventariale
+    type: 'SALE' | 'ADJUSTMENT' | 'PURCHASE'; // Vendita, Rettifica o Acquisto (Carico da ordine)
     cliente: string;
     nomeBirra: string;
     lotto: string;
     formato: string;
-    quantita: number; // Sarà un numero negativo
+    quantita: number; // Sarà un numero negativo per SALE, positivo per PURCHASE
     relatedDocId?: string; // ID della commissione d'ordine o dell'inventario
 }
 
 export interface SalesOrderItem {
     beerName: string;
+    lotto: string;
     format: string;
     quantity: number;
+    customBeerName?: string; // Nome personalizzato per il cliente
 }
 
 export interface SalesOrder {
