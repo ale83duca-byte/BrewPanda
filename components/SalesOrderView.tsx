@@ -115,6 +115,15 @@ export const SalesOrderView: React.FC<SalesOrderViewProps> = ({ selectedYear, on
         return alvereseStock ? Object.keys(alvereseStock) : [];
     }, [beerStock]);
 
+    const groupedOrders = useMemo(() => {
+        const groups: Record<string, SalesOrder[]> = {};
+        orders.forEach(order => {
+            if (!groups[order.client]) groups[order.client] = [];
+            groups[order.client].push(order);
+        });
+        return groups;
+    }, [orders]);
+
     const availableLottos = (beerName: string) => {
         if (!beerName || !beerStock["ALVERESE"] || !beerStock["ALVERESE"][beerName]) return [];
         const lottos = beerStock["ALVERESE"][beerName].map(item => item.lotto);
@@ -329,15 +338,6 @@ export const SalesOrderView: React.FC<SalesOrderViewProps> = ({ selectedYear, on
             </div>
         );
     }
-    
-    const groupedOrders = useMemo(() => {
-        const groups: Record<string, SalesOrder[]> = {};
-        orders.forEach(order => {
-            if (!groups[order.client]) groups[order.client] = [];
-            groups[order.client].push(order);
-        });
-        return groups;
-    }, [orders]);
 
     return (
         <div className="bg-brew-dark-secondary p-4 rounded-lg shadow-lg">
