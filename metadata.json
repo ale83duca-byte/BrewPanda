@@ -1,0 +1,5 @@
+{
+  "name": "Brew Panda - Brewery Management",
+  "description": "A comprehensive web application to manage all operational aspects of a brewery, from inventory and production lots to fermentation tracking and packaging. This app is a modern web-based version of the original Brew Panda desktop application.",
+  "requestFramePermissions": []
+}
