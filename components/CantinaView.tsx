@@ -95,7 +95,7 @@ export const CantinaView: React.FC<CantinaViewProps> = ({ selectedYear }) => {
         }
     };
 
-    const getFermenterStatus = (activeLot: BrewHeader | undefined): { status: 'free' | 'occupied' | 'finishing' } => {
+    const getFermenterStatus = (activeLot: BrewHeader | undefined): { status: 'free' | 'occupied' | 'finishing' | 'alarm', expectedDate?: Date } => {
         if (!activeLot) {
             return { status: 'free' };
         }
@@ -112,10 +112,17 @@ export const CantinaView: React.FC<CantinaViewProps> = ({ selectedYear }) => {
 
             const daysRemaining = (dataFinePrevista.getTime() - today.getTime()) / (1000 * 3600 * 24);
 
+            // If the packaging date has passed
+            if (daysRemaining < 0) {
+                return { status: 'alarm', expectedDate: dataFinePrevista };
+            }
+
             // If the packaging date is today or in the next 5 days, it's 'finishing'
             if (daysRemaining >= 0 && daysRemaining <= 5) {
-                return { status: 'finishing' };
+                return { status: 'finishing', expectedDate: dataFinePrevista };
             }
+
+            return { status: 'occupied', expectedDate: dataFinePrevista };
         }
         
         return { status: 'occupied' };
@@ -125,6 +132,7 @@ export const CantinaView: React.FC<CantinaViewProps> = ({ selectedYear }) => {
         free: 'bg-green-500/20 border-green-500',
         occupied: 'bg-red-500/20 border-red-500',
         finishing: 'bg-yellow-500/20 border-yellow-500',
+        alarm: 'bg-yellow-500/40 border-yellow-500 animate-pulse ring-4 ring-yellow-500',
     }
 
     return (
@@ -161,7 +169,7 @@ export const CantinaView: React.FC<CantinaViewProps> = ({ selectedYear }) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
                 {fermenters.map(ferm => {
                     const activeLot = activeLotsByFermenter[ferm.nome];
-                    const { status } = getFermenterStatus(activeLot);
+                    const { status, expectedDate } = getFermenterStatus(activeLot);
                     const latestTemp = activeLot ? latestTemperaturesByLotto[activeLot.LOTTO] : undefined;
                     
                     return (
@@ -179,6 +187,14 @@ export const CantinaView: React.FC<CantinaViewProps> = ({ selectedYear }) => {
                                             <p className="text-xs text-slate-400">Lotto Attivo</p>
                                             <p className="text-2xl font-bold text-brew-accent bg-slate-800 px-3 py-1 rounded-md">{activeLot.LOTTO}</p>
                                             <p className="text-sm font-semibold text-white">{activeLot.LITRI_FINALI} L</p>
+                                            {expectedDate && (
+                                                <div className="mt-2 text-center bg-black/30 p-2 rounded-md w-full">
+                                                    <p className="text-[10px] text-slate-300 uppercase font-bold">Data Conf. Prevista</p>
+                                                    <p className={`text-sm font-bold ${status === 'alarm' ? 'text-red-400' : 'text-white'}`}>
+                                                        {expectedDate.toLocaleDateString('it-IT')}
+                                                    </p>
+                                                </div>
+                                            )}
                                         </>
                                     )
                                 )}
