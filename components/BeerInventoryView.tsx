@@ -80,14 +80,19 @@ export const BeerInventoryView: React.FC<BeerInventoryViewProps> = ({ selectedYe
 
             const stockMap = new Map<string, BeerStockItem>();
             const lottoInfo = new Map<string, { clientName: string, beerName: string }>();
+            const lottoExpiry = new Map<string, string>();
+
             data.COTTE_HEAD.forEach(c => lottoInfo.set(c.LOTTO, { clientName: c.CLIENTE, beerName: c.NOME_BIRRA }));
 
             (data.BEER_WAREHOUSE_INITIAL || []).forEach(item => {
                 const key = `${item.cliente}|${item.nomeBirra}|${item.lotto}|${item.formato}`;
                 stockMap.set(key, { ...item });
+                if (item.dataScadenza) lottoExpiry.set(item.lotto, item.dataScadenza);
             });
             (data.CONFEZIONAMENTO || []).forEach(pkg => {
                  const info = lottoInfo.get(pkg.LOTTO_PROD);
+                 if (pkg.DATA_SCADENZA) lottoExpiry.set(pkg.LOTTO_PROD, pkg.DATA_SCADENZA);
+                 
                  if (info) {
                     const key = `${info.clientName}|${info.beerName}|${pkg.LOTTO_PROD}|${pkg.FORMATO}`;
                     const existing = stockMap.get(key);
@@ -103,6 +108,16 @@ export const BeerInventoryView: React.FC<BeerInventoryViewProps> = ({ selectedYe
                 const existing = stockMap.get(key);
                 if (existing) {
                     existing.quantita += mov.quantita;
+                } else if (mov.quantita > 0) {
+                    // Create new entry if it's a load (e.g. Purchase from Sales Order)
+                    stockMap.set(key, { 
+                        cliente: mov.cliente, 
+                        nomeBirra: mov.nomeBirra, 
+                        lotto: mov.lotto, 
+                        formato: mov.formato, 
+                        quantita: mov.quantita, 
+                        dataScadenza: lottoExpiry.get(mov.lotto) || '' 
+                    });
                 }
             });
 

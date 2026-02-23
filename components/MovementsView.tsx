@@ -25,11 +25,15 @@ export const MovementsView: React.FC<MovementsViewProps> = ({ selectedYear, sear
                 .filter(mov => mov.N_FATTURA !== 'RIPORTO_ANNO_PREC')
                 .sort((a, b) => {
                     try {
-                        const dateA = new Date(a.DATA.split('/').reverse().join('-')).getTime();
-                        const dateB = new Date(b.DATA.split('/').reverse().join('-')).getTime();
-                        if (isNaN(dateA) || isNaN(dateB)) return 0;
-                        return dateB - dateA;
-                    } catch (e) {
+                        const dateA = a.DATA ? new Date(a.DATA.split('/').reverse().join('-')).getTime() : 0;
+                        const dateB = b.DATA ? new Date(b.DATA.split('/').reverse().join('-')).getTime() : 0;
+                        
+                        if (dateB !== dateA) {
+                            return dateB - dateA; // Descending date
+                        }
+                        // Secondary sort by ID or original index to ensure stability
+                        return b.originalIndex - a.originalIndex;
+                    } catch (_e) {
                         return 0;
                     }
                 });
