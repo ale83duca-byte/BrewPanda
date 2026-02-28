@@ -79,7 +79,7 @@ export const Home: React.FC<HomeProps> = ({ warehouseStatus, selectedYear, onRef
                     const dateB = new Date(b.DATA_PROD.split('/').reverse().join('-')).getTime();
                     if (isNaN(dateA) || isNaN(dateB)) return 0;
                     return dateA - dateB;
-                } catch (e) {
+                } catch {
                     return 0;
                 }
             });
@@ -93,7 +93,7 @@ export const Home: React.FC<HomeProps> = ({ warehouseStatus, selectedYear, onRef
                     ? relatedPackaging.sort((a, b) => {
                         try {
                            return new Date(a.DATA.split('/').reverse().join('-')).getTime() - new Date(b.DATA.split('/').reverse().join('-')).getTime()
-                        } catch(e) { return 0; }
+                        } catch { return 0; }
                     })[0].DATA
                     : 'N/D';
 
@@ -112,10 +112,16 @@ export const Home: React.FC<HomeProps> = ({ warehouseStatus, selectedYear, onRef
                     return `${qta} x ${formato}`;
                 }).join(' / ') || 'N/D';
 
-                const litriContaMostoCalc = (cotta.mustCounterMeasured || 0) - (cotta.mustCounterPrevious || 0);
+                const parseCounter = (val: string | number | undefined) => {
+                    if (typeof val === 'number') return val;
+                    if (!val) return 0;
+                    return parseFloat(val.replace(',', '.')) || 0;
+                };
+
+                const litriContaMostoCalc = parseCounter(cotta.mustCounterMeasured) - parseCounter(cotta.mustCounterPrevious);
     
-                const gasCottaCalc = (cotta.gasBrewCounterCurrent || 0) - (cotta.gasBrewCounterPrevious || 0);
-                const gasConfCalc = (cotta.gasPackagingCounterCurrent || 0) - (cotta.gasPackagingCounterPrevious || 0);
+                const gasCottaCalc = parseCounter(cotta.gasBrewCounterCurrent) - parseCounter(cotta.gasBrewCounterPrevious);
+                const gasConfCalc = parseCounter(cotta.gasPackagingCounterCurrent) - parseCounter(cotta.gasPackagingCounterPrevious);
                 const gasTotale = gasCottaCalc + gasConfCalc;
 
                 return {

@@ -59,12 +59,14 @@ export interface BrewHeader {
   GIORNI_FERMENTAZIONE_PREVISTI: string;
   NOTE?: string;
   // Campi contatori
-  mustCounterPrevious?: number;
-  mustCounterMeasured?: number;
-  gasBrewCounterPrevious?: number;
-  gasBrewCounterCurrent?: number;
-  gasPackagingCounterPrevious?: number;
-  gasPackagingCounterCurrent?: number;
+  mustCounterPrevious?: string;
+  mustCounterMeasured?: string;
+  gasBrewCounterPrevious?: string;
+  gasBrewCounterCurrent?: string;
+  gasPackagingCounterPrevious?: string;
+  gasPackagingCounterCurrent?: string;
+  washWaterCounterPrevious?: string;
+  washWaterCounterMeasured?: string;
   // Campi per analisi costi
   costAnalysisGasType?: 'gpl' | 'metano';
   costAnalysisUseStorage?: boolean;

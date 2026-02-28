@@ -15,16 +15,17 @@ interface BrewPageProps {
     selectedYear: string;
     lottoId: string | null;
     onExit: () => void;
-    onSaveNewLotto?: (lottoId: string) => void;
+    onSaveNewLotto?: (id: string) => void; // eslint-disable-line
 }
 
 const initialHeaderState: BrewHeader = {
     LOTTO: '', CLIENTE: '', DATA_PROD: new Date().toLocaleDateString('it-IT'), NOME_BIRRA: '', FERMENTATORE: '',
     PLATO_INIZIALE: '', LITRI_FINALI: '', GAS_COTTA: '', GAS_CONFEZIONAMENTO: '', FLAG_CO2: false, FLAG_AZOTO: false, TIPO_BIRRA: '',
     TIPO_FERMENTAZIONE: '', GIORNI_FERMENTAZIONE_PREVISTI: '', NOTE: '',
-    mustCounterPrevious: 0, mustCounterMeasured: 0,
-    gasBrewCounterPrevious: 0, gasBrewCounterCurrent: 0,
-    gasPackagingCounterPrevious: 0, gasPackagingCounterCurrent: 0,
+    mustCounterPrevious: '', mustCounterMeasured: '',
+    gasBrewCounterPrevious: '', gasBrewCounterCurrent: '',
+    gasPackagingCounterPrevious: '', gasPackagingCounterCurrent: '',
+    washWaterCounterPrevious: '', washWaterCounterMeasured: '',
 };
 
 interface IngredientRowState {
@@ -205,13 +206,7 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
             setFermentationData(data.FERMENTAZIONE.filter(f => f.LOTTO === lottoId).sort((a,b) => a.GIORNO - b.GIORNO));
             setPackagingData(data.CONFEZIONAMENTO.filter(p => p.LOTTO_PROD === lottoId));
         } else {
-            const lastCotta = cotteData.length > 0 ? cotteData[cotteData.length - 1] : null;
-            setHeader({
-                ...initialHeaderState,
-                mustCounterPrevious: lastCotta?.mustCounterMeasured || 0,
-                gasBrewCounterPrevious: lastCotta?.gasBrewCounterCurrent || 0,
-                gasPackagingCounterPrevious: lastCotta?.gasPackagingCounterCurrent || 0,
-            });
+            setHeader(initialHeaderState);
             setIngredients([]);
             setFermentationData([]);
             setPackagingData([]);
@@ -256,18 +251,17 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
         
         const isNumeric = field === 'PLATO_INIZIALE' || field === 'LITRI_FINALI';
         const isInteger = field === 'GIORNI_FERMENTAZIONE_PREVISTI';
+        const isCounter = [
+            'mustCounterPrevious', 'mustCounterMeasured',
+            'gasBrewCounterPrevious', 'gasBrewCounterCurrent',
+            'gasPackagingCounterPrevious', 'gasPackagingCounterCurrent',
+            'washWaterCounterPrevious', 'washWaterCounterMeasured'
+        ].includes(field);
 
-        if ((isNumeric || isInteger) && value !== '' && !/^[0-9]*[.,]?[0-9]*$/.test(value)) {
+        if ((isNumeric || isInteger || isCounter) && value !== '' && !/^[0-9]*[.,]?[0-9]*$/.test(value)) {
             return;
         }
         setHeader(prev => ({ ...prev, [field]: value }));
-    };
-
-    const handleNumericHeaderChange = (field: keyof BrewHeader, value: string) => {
-        if (value === '' || /^[0-9]*[.,]?[0-9]*$/.test(value)) {
-            const numericValue = parseFloat(value.replace(',', '.')) || 0;
-            setHeader(prev => ({ ...prev, [field]: numericValue }));
-        }
     };
 
     const handleClienteSelection = (clienteNome: string) => {
@@ -353,8 +347,13 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
         const isNewLotto = !lottoId;
         const upperLotto = header.LOTTO.toUpperCase().trim();
         
-        const gasCottaValue = (header.gasBrewCounterCurrent || 0) - (header.gasBrewCounterPrevious || 0);
-        const gasConfValue = (header.gasPackagingCounterCurrent || 0) - (header.gasPackagingCounterPrevious || 0);
+        const parse = (val: string | number | undefined) => {
+             if (typeof val === 'number') return val;
+             if (!val) return 0;
+             return parseFloat(val.replace(',', '.')) || 0;
+        };
+        const gasCottaValue = parse(header.gasBrewCounterCurrent) - parse(header.gasBrewCounterPrevious);
+        const gasConfValue = parse(header.gasPackagingCounterCurrent) - parse(header.gasPackagingCounterPrevious);
 
         const updatedHeader: BrewHeader = { 
             ...header, 
@@ -400,7 +399,7 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
                 });
             });
         });
-        const newPackagingData = newPackagingItems.map(({ isNew, materials, ...rest }) => rest);
+        const newPackagingData = newPackagingItems.map(({ isNew: _isNew, materials: _materials, ...rest }) => rest); // eslint-disable-line
 
         // Save everything
         await saveCottaAndPackaging(selectedYear, {
@@ -646,8 +645,14 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
         }
     };
 
-    const gasCottaCalc = (header.gasBrewCounterCurrent || 0) - (header.gasBrewCounterPrevious || 0);
-    const gasConfValue = (header.gasPackagingCounterCurrent || 0) - (header.gasPackagingCounterPrevious || 0);
+    const parseCounter = (val: string | number | undefined) => {
+        if (typeof val === 'number') return val;
+        if (!val) return 0;
+        return parseFloat(val.replace(',', '.')) || 0;
+    };
+
+    const gasCottaCalc = parseCounter(header.gasBrewCounterCurrent) - parseCounter(header.gasBrewCounterPrevious);
+    const gasConfValue = parseCounter(header.gasPackagingCounterCurrent) - parseCounter(header.gasPackagingCounterPrevious);
 
     return (
         <div className="space-y-6 text-brew-light">
@@ -688,12 +693,25 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
                 <div className="col-span-1 md:col-span-2 lg:grid-cols-4 border-t border-slate-700 mt-4 pt-4">
                     <h3 className="text-lg font-semibold text-brew-accent mb-2">{t('brewPage.mustCounter')}</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <InputNumber label={t('brewPage.mustCounterPrevious')} value={header.mustCounterPrevious} onChange={e => handleNumericHeaderChange('mustCounterPrevious', e.target.value)} disabled={isLottoClosed || !!lottoId} />
-                        <InputNumber label={t('brewPage.mustCounterMeasured')} value={header.mustCounterMeasured} onChange={e => handleNumericHeaderChange('mustCounterMeasured', e.target.value)} disabled={isLottoClosed} />
+                        <Input label={t('brewPage.mustCounterPrevious')} value={header.mustCounterPrevious} onChange={e => handleHeaderChange('mustCounterPrevious', e.target.value)} disabled={isLottoClosed} />
+                        <Input label={t('brewPage.mustCounterMeasured')} value={header.mustCounterMeasured} onChange={e => handleHeaderChange('mustCounterMeasured', e.target.value)} disabled={isLottoClosed} />
                         <div>
                             <label className="block text-xs font-medium text-gray-400 mb-1">{t('brewPage.mustCounterResult')}</label>
                             <div className="w-full bg-brew-dark p-2 rounded-md border border-slate-700 text-lg font-bold text-yellow-300 h-[42px] flex items-center">
-                                {((header.mustCounterMeasured || 0) - (header.mustCounterPrevious || 0)).toFixed(1)} L
+                                {(parseCounter(header.mustCounterMeasured) - parseCounter(header.mustCounterPrevious)).toFixed(1)} L
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div className="col-span-1 md:col-span-2 lg:grid-cols-4 border-t border-slate-700 mt-4 pt-4">
+                    <h3 className="text-lg font-semibold text-brew-accent mb-2">Valore Conta Mosto Lavaggi Controflusso</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <Input label="Valore Precedente" value={header.washWaterCounterPrevious} onChange={e => handleHeaderChange('washWaterCounterPrevious', e.target.value)} disabled={isLottoClosed} />
+                        <Input label="Valore Misurato" value={header.washWaterCounterMeasured} onChange={e => handleHeaderChange('washWaterCounterMeasured', e.target.value)} disabled={isLottoClosed} />
+                        <div>
+                            <label className="block text-xs font-medium text-gray-400 mb-1">Acqua totale di lavaggi</label>
+                            <div className="w-full bg-brew-dark p-2 rounded-md border border-slate-700 text-lg font-bold text-cyan-300 h-[42px] flex items-center">
+                                {(parseCounter(header.washWaterCounterMeasured) - parseCounter(header.washWaterCounterPrevious)).toFixed(1)} L
                             </div>
                         </div>
                     </div>
@@ -768,8 +786,8 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
                                 <div>
                                     <h5 className="text-sm font-semibold text-slate-300 mb-1">{t('brewPage.gasBrewCounters')}</h5>
                                     <div className="flex gap-2 items-end">
-                                        <InputNumber label={t('brewPage.counterPrevious')} value={header.gasBrewCounterPrevious} onChange={e => handleNumericHeaderChange('gasBrewCounterPrevious', e.target.value)} disabled={isLottoClosed || !!lottoId} />
-                                        <InputNumber label={t('brewPage.counterCurrent')} value={header.gasBrewCounterCurrent} onChange={e => handleNumericHeaderChange('gasBrewCounterCurrent', e.target.value)} disabled={isLottoClosed} />
+                                        <Input label={t('brewPage.counterPrevious')} value={header.gasBrewCounterPrevious} onChange={e => handleHeaderChange('gasBrewCounterPrevious', e.target.value)} disabled={isLottoClosed} />
+                                        <Input label={t('brewPage.counterCurrent')} value={header.gasBrewCounterCurrent} onChange={e => handleHeaderChange('gasBrewCounterCurrent', e.target.value)} disabled={isLottoClosed} />
                                         <div className="pb-2 text-2xl font-bold">=</div>
                                         <div className="flex-1">
                                             <label className="block text-xs font-medium text-gray-400 mb-1">{t('brewPage.gasUsed')}</label>
@@ -782,8 +800,8 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
                                 <div>
                                     <h5 className="text-sm font-semibold text-slate-300 mb-1">{t('brewPage.gasPackagingCounters')}</h5>
                                     <div className="flex gap-2 items-end">
-                                        <InputNumber label={t('brewPage.counterPrevious')} value={header.gasPackagingCounterPrevious} onChange={e => handleNumericHeaderChange('gasPackagingCounterPrevious', e.target.value)} disabled={isLottoClosed || !!lottoId} />
-                                        <InputNumber label={t('brewPage.counterCurrent')} value={header.gasPackagingCounterCurrent} onChange={e => handleNumericHeaderChange('gasPackagingCounterCurrent', e.target.value)} disabled={isLottoClosed} />
+                                        <Input label={t('brewPage.counterPrevious')} value={header.gasPackagingCounterPrevious} onChange={e => handleHeaderChange('gasPackagingCounterPrevious', e.target.value)} disabled={isLottoClosed} />
+                                        <Input label={t('brewPage.counterCurrent')} value={header.gasPackagingCounterCurrent} onChange={e => handleHeaderChange('gasPackagingCounterCurrent', e.target.value)} disabled={isLottoClosed} />
                                         <div className="pb-2 text-2xl font-bold">=</div>
                                         <div className="flex-1">
                                             <label className="block text-xs font-medium text-gray-400 mb-1">{t('brewPage.gasUsed')}</label>
@@ -1024,19 +1042,6 @@ const Field: React.FC<{label: string, children: React.ReactNode}> = ({ label, ch
         {children}
     </div>
 );
-
-const InputNumber: React.FC<{ label: string; value: number | undefined } & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value'>> = ({ label, value, ...props }) => (
-    <div className="flex-1">
-        <label className="block text-xs font-medium text-gray-400 mb-1">{label}</label>
-        <input 
-            {...props} 
-            type="text"
-            value={value === undefined || value === null || isNaN(value) ? '' : String(value)}
-            className="w-full bg-brew-dark p-2 rounded-md border border-slate-600 focus:ring-brew-accent focus:border-brew-accent text-sm disabled:opacity-50" 
-        />
-    </div>
-);
-
 
 const Checkbox: React.FC<{ label: string } & React.InputHTMLAttributes<HTMLInputElement>> = ({ label, ...props }) => (
     <label className="flex items-center space-x-2 cursor-pointer text-sm">
