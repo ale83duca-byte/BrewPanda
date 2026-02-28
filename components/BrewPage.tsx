@@ -698,7 +698,7 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
                         <div>
                             <label className="block text-xs font-medium text-gray-400 mb-1">{t('brewPage.mustCounterResult')}</label>
                             <div className="w-full bg-brew-dark p-2 rounded-md border border-slate-700 text-lg font-bold text-yellow-300 h-[42px] flex items-center">
-                                {(parseCounter(header.mustCounterMeasured) - parseCounter(header.mustCounterPrevious)).toFixed(1)} L
+                                {(parseCounter(header.mustCounterMeasured) - parseCounter(header.mustCounterPrevious)).toFixed(2)} L
                             </div>
                         </div>
                     </div>
@@ -711,7 +711,7 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
                         <div>
                             <label className="block text-xs font-medium text-gray-400 mb-1">Acqua totale di lavaggi</label>
                             <div className="w-full bg-brew-dark p-2 rounded-md border border-slate-700 text-lg font-bold text-cyan-300 h-[42px] flex items-center">
-                                {(parseCounter(header.washWaterCounterMeasured) - parseCounter(header.washWaterCounterPrevious)).toFixed(1)} L
+                                {(parseCounter(header.washWaterCounterMeasured) - parseCounter(header.washWaterCounterPrevious)).toFixed(2)} L
                             </div>
                         </div>
                     </div>
