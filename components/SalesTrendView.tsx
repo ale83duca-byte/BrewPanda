@@ -77,7 +77,7 @@ export const SalesTrendView: React.FC<SalesTrendViewProps> = ({ selectedYear }) 
     const analysisData = useMemo(() => {
         const clientName = clients.find(c => c.id === selectedClientId)?.nome;
         const movementsToAnalyze = clientName 
-            ? salesMovements.filter(m => (m.destinatario || m.cliente) === clientName)
+            ? salesMovements.filter(m => m.cliente === clientName)
             : salesMovements;
 
         if (movementsToAnalyze.length === 0) return null;
@@ -105,8 +105,7 @@ export const SalesTrendView: React.FC<SalesTrendViewProps> = ({ selectedYear }) 
         const salesByClient = salesMovements.reduce((acc, mov) => {
             const config = CONFIG_PACKAGING[mov.formato];
             const liters = config ? Math.abs(mov.quantita) * config.litriUnit : 0;
-            const client = mov.destinatario || mov.cliente;
-            acc[client] = (acc[client] || 0) + liters;
+            acc[mov.cliente] = (acc[mov.cliente] || 0) + liters;
             return acc;
         }, {} as Record<string, number>);
         
