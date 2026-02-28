@@ -36,12 +36,11 @@ export const CONFIG_PACKAGING: Record<string, { pezziPerCartone: number; litriUn
 };
 
 export const PRICE_LIST_FORMATS = [
-    'FUSTI 20 LT',
+    'FUSTO 20 LT',
     'FUSTO 5 LT',
-    'FUSTI 24 LT',
-    'CARTONI 75X6',
-    'CARTONI 50X15',
-    'CARTONI 33X12',
-    'CARTONI 33X24',
+    'FUSTO 24 LT',
+    'BOTTIGLIA 75CL',
+    'BOTTIGLIA 50CL',
+    'BOTTIGLIA 33CL',
     'ACCIAIO 20 LT'
 ];

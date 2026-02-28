@@ -104,24 +104,55 @@ export const PackagedBeerOrdersView: React.FC<PackagedBeerOrdersViewProps> = ({ 
 
     useEffect(() => { loadData(); }, [loadData]);
 
-    const getPrice = (clientName: string, beerName: string, format: string) => {
+    const mapFormatToPriceKey = useCallback((format: string): string | null => {
+        if (!format) return null;
+        const fmt = format.toUpperCase();
+        if (fmt.includes('BOTT. 33CL')) return 'BOTTIGLIA 33CL';
+        if (fmt.includes('BOTT. 50CL')) return 'BOTTIGLIA 50CL';
+        if (fmt.includes('BOTT. 75CL')) return 'BOTTIGLIA 75CL';
+        if (fmt.includes('24L') || fmt.includes('24LT')) return 'FUSTO 24 LT';
+        if (fmt.includes('20L') || fmt.includes('20LT')) {
+            if (fmt.includes('ACCIAIO')) return 'ACCIAIO 20 LT';
+            return 'FUSTO 20 LT';
+        }
+        if (fmt.includes('5L') || fmt.includes('5LT')) return 'FUSTO 5 LT';
+        return null;
+    }, []);
+
+    const getPrice = useCallback((clientName: string, beerName: string, format: string) => {
+        const priceKey = mapFormatToPriceKey(format);
+        if (!priceKey) return 0;
+
         // 1. Check for specific Client Offer
         const client = clients.find(c => c.nome === clientName);
         if (client) {
             const offer = clientOffers.find(o => o.clientId === client.id);
-            if (offer && offer.prices[beerName] && offer.prices[beerName][format]) {
-                return offer.prices[beerName][format];
+            if (offer && offer.prices[beerName] && offer.prices[beerName][priceKey]) {
+                return offer.prices[beerName][priceKey];
             }
         }
 
         // 2. Check General Price List
         const priceItem = priceList.find(p => p.beerName === beerName);
-        if (priceItem && priceItem.prices[format]) {
-            return priceItem.prices[format];
+        if (priceItem && priceItem.prices[priceKey]) {
+            return priceItem.prices[priceKey];
         }
 
         return 0;
-    };
+    }, [clients, clientOffers, priceList, mapFormatToPriceKey]);
+
+    // Update prices when client changes
+    useEffect(() => {
+        if (selectedClient) {
+            setOrderItems(prevItems => prevItems.map(item => {
+                if (item.beerName && item.format) {
+                    const newPrice = getPrice(selectedClient, item.beerName, item.format);
+                    return { ...item, price: newPrice, total: item.quantity * newPrice };
+                }
+                return item;
+            }));
+        }
+    }, [selectedClient, getPrice]);
 
     const handleItemChange = (index: number, field: keyof PackagedBeerOrderItem, value: string | number) => {
         const newItems = [...orderItems];
@@ -137,6 +168,12 @@ export const PackagedBeerOrdersView: React.FC<PackagedBeerOrdersViewProps> = ({ 
             // Auto-fetch price when format changes
             const price = getPrice(selectedClient, currentItem.beerName, value as string);
             currentItem.price = price;
+        } else if (field === 'quantity') {
+             // If price is 0, try to fetch it again (in case client was selected late or something)
+             if (currentItem.price === 0 && currentItem.format && selectedClient) {
+                 const price = getPrice(selectedClient, currentItem.beerName, currentItem.format);
+                 if (price > 0) currentItem.price = price;
+             }
         }
 
         // Recalculate total for the row
