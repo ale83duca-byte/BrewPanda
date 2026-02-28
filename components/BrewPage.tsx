@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 // FIX: Add 'upsertItemInSheet' to imports to resolve a 'Cannot find name' error.
 import { getBreweryData, getSheetData, deleteMovementsByInvoiceAndSync, saveDataToSheet, saveCottaAndPackaging, upsertItemInSheet } from '../services/dataService';
 import type { BrewHeader, FermentationDataPoint, PackagingData, Movement, WarehouseItem, FermenterConfig, Cliente, Birra, RawWarehouseItem } from '../types';
-import { TrashIcon, PlusIcon, ArrowUturnLeftIcon } from './icons';
+import { TrashIcon, PlusIcon, ArrowUturnLeftIcon, PencilIcon } from './icons';
 import { CONFIG_PACKAGING } from '../constants';
 import { FermentationChart } from './FermentationChart';
 import { Modal } from './Modal';
@@ -309,6 +309,16 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
         setIngredients(prev => [...prev, { id: Date.now(), tipologia, nome: '', lotto_fornitore: '', qta: '', gia_scaricato: false }]);
     };
     
+    const [editingIngredientId, setEditingIngredientId] = useState<number | null>(null);
+
+    const toggleEditIngredient = (id: number) => {
+        if (editingIngredientId === id) {
+            setEditingIngredientId(null);
+        } else {
+            setEditingIngredientId(id);
+        }
+    };
+
     const updateIngredientRow = (id: number, field: 'nome' | 'lotto_fornitore' | 'qta', value: string) => {
         if (field === 'qta' && value !== '' && !/^[0-9]*[.,]?[0-9]*$/.test(value)) {
             return;
@@ -321,7 +331,9 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
             switch(field) {
                 case 'nome':
                     newIng.nome = value;
-                    newIng.lotto_fornitore = '';
+                    if (!editingIngredientId) {
+                         newIng.lotto_fornitore = '';
+                    }
                     break;
                 case 'lotto_fornitore':
                     newIng.lotto_fornitore = value;
@@ -726,13 +738,22 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
                             <button onClick={() => addIngredientRow(cat)} className="flex items-center px-2 py-1 bg-brew-green rounded-md text-xs hover:bg-opacity-80 disabled:bg-slate-600" disabled={isLottoClosed}><PlusIcon className="w-4 h-4 mr-1"/>AGGIUNGI</button>
                         </div>
                         <div className="space-y-2">
-                            {ingredients.filter(i => i.tipologia === cat).map(ing => (
-                                <div key={ing.id} className="grid grid-cols-[1fr,1fr,auto,auto,auto] gap-2 items-center">
-                                    <select value={ing.nome} onChange={e => updateIngredientRow(ing.id, 'nome', e.target.value)} className="bg-brew-dark p-1.5 rounded-md text-sm w-full disabled:opacity-50" disabled={ing.gia_scaricato || isLottoClosed}>
+                            {ingredients.filter(i => i.tipologia === cat).map(ing => {
+                                const isEditing = editingIngredientId === ing.id;
+                                const availableIngredients = warehouseStock.filter(s => s.TIPOLOGIA === cat);
+                                // Ensure the current ingredient is in the list even if out of stock, to prevent "Seleziona..."
+                                const currentIngredientInStock = availableIngredients.find(s => s.NOME === ing.nome);
+                                const options = currentIngredientInStock 
+                                    ? availableIngredients 
+                                    : [...availableIngredients, { TIPOLOGIA: cat, NOME: ing.nome, GIACENZA: 0 } as WarehouseItem];
+
+                                return (
+                                <div key={ing.id} className="grid grid-cols-[1fr,1fr,auto,auto,auto,auto] gap-2 items-center">
+                                    <select value={ing.nome} onChange={e => updateIngredientRow(ing.id, 'nome', e.target.value)} className="bg-brew-dark p-1.5 rounded-md text-sm w-full disabled:opacity-50" disabled={(ing.gia_scaricato && !isEditing) || isLottoClosed}>
                                         <option value="">Seleziona...</option>
-                                        {warehouseStock.filter(s => s.TIPOLOGIA === cat).map(s => <option key={s.NOME} value={String(s.NOME)}>{s.NOME}</option>)}
+                                        {options.map(s => <option key={s.NOME} value={String(s.NOME)}>{s.NOME}</option>)}
                                     </select>
-                                    {ing.gia_scaricato ? (
+                                    {ing.gia_scaricato && !isEditing ? (
                                         <input 
                                             type="text" 
                                             value={ing.lotto_fornitore} 
@@ -740,16 +761,33 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
                                             disabled 
                                         />
                                     ) : (
-                                        <select value={ing.lotto_fornitore} onChange={e => updateIngredientRow(ing.id, 'lotto_fornitore', e.target.value)} className="bg-brew-dark p-1.5 rounded-md text-sm w-full disabled:opacity-50" disabled={isLottoClosed || !ing.nome}>
+                                        <select value={ing.lotto_fornitore} onChange={e => updateIngredientRow(ing.id, 'lotto_fornitore', e.target.value)} className="bg-brew-dark p-1.5 rounded-md text-sm w-full disabled:opacity-50" disabled={(isLottoClosed && !isEditing) || !ing.nome}>
                                             <option value="">Seleziona Lotto...</option>
                                             {(ingredientLotsStock[ing.nome.toUpperCase()] || []).map(l => <option key={l.lotto} value={String(l.lotto)}>{`${l.lotto} (Giac: ${l.giacenza.toFixed(2)})`}</option>)}
+                                            {/* If editing and the current lot is not in stock (e.g. fully used), add it as an option */}
+                                            {isEditing && ing.lotto_fornitore && !(ingredientLotsStock[ing.nome.toUpperCase()] || []).some(l => l.lotto === ing.lotto_fornitore) && (
+                                                <option value={ing.lotto_fornitore}>{ing.lotto_fornitore} (Esaurito)</option>
+                                            )}
                                         </select>
                                     )}
-                                    <input type="text" placeholder="Quantità" value={ing.qta} onChange={e => updateIngredientRow(ing.id, 'qta', e.target.value)} className="bg-brew-dark p-1.5 rounded-md text-sm w-24 disabled:opacity-50" disabled={ing.gia_scaricato || isLottoClosed} />
+                                    <input type="text" placeholder="Quantità" value={ing.qta} onChange={e => updateIngredientRow(ing.id, 'qta', e.target.value)} className="bg-brew-dark p-1.5 rounded-md text-sm w-24 disabled:opacity-50" disabled={(ing.gia_scaricato && !isEditing) || isLottoClosed} />
                                     <span className={`text-xl ${ing.gia_scaricato ? 'text-gray-500' : 'text-green-400'}`}>{ing.gia_scaricato ? '✅' : '🆕'}</span>
-                                    <button onClick={() => removeIngredientRow(ing.id)} className="p-1 text-red-500 hover:text-red-400 disabled:text-gray-500 disabled:cursor-not-allowed" disabled={ing.gia_scaricato || isLottoClosed}><TrashIcon className="w-5 h-5"/></button>
+                                    
+                                    {ing.gia_scaricato && !isLottoClosed && (
+                                        <button 
+                                            onClick={() => toggleEditIngredient(ing.id)} 
+                                            className={`p-1 hover:text-brew-accent ${isEditing ? 'text-brew-accent' : 'text-gray-400'}`}
+                                            title="Modifica ingrediente scaricato"
+                                        >
+                                            <PencilIcon className="w-5 h-5"/>
+                                        </button>
+                                    )}
+                                    {!ing.gia_scaricato && !isLottoClosed && <div className="w-7"></div>}
+
+                                    <button onClick={() => removeIngredientRow(ing.id)} className="p-1 text-red-500 hover:text-red-400 disabled:text-gray-500 disabled:cursor-not-allowed" disabled={(ing.gia_scaricato && !isEditing) || isLottoClosed}><TrashIcon className="w-5 h-5"/></button>
                                 </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 ))}
