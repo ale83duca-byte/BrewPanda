@@ -195,6 +195,7 @@ export interface BeerMovement {
     formato: string;
     quantita: number; // Sarà un numero negativo per SALE, positivo per PURCHASE
     relatedDocId?: string; // ID della commissione d'ordine o dell'inventario
+    destinatario?: string; // Optional: recipient of the sale
 }
 
 export interface SalesOrderItem {
@@ -210,6 +211,25 @@ export interface SalesOrder {
     date: string;
     client: string;
     items: SalesOrderItem[];
+}
+
+export interface PackagedBeerOrderItem {
+    beerName: string;
+    lotto: string;
+    format: string;
+    quantity: number;
+    price: number;
+    total: number;
+}
+
+export interface PackagedBeerOrder {
+    id: string;
+    date: string;
+    client: string;
+    items: PackagedBeerOrderItem[];
+    totalNet: number;
+    iva: number;
+    totalGross: number;
 }
 
 export interface BeerInventoryCheckItem {
@@ -258,6 +278,7 @@ export interface BreweryData {
   BEER_WAREHOUSE_INITIAL: InitialBeerStock[];
   BEER_MOVEMENTS: BeerMovement[];
   SALES_ORDERS: SalesOrder[];
+  PACKAGED_BEER_ORDERS: PackagedBeerOrder[];
   BEER_INVENTORY_CHECKS: BeerInventoryCheck[];
   BEER_PRICE_LIST: BeerPriceList[];
   CLIENT_OFFERS: ClientOffer[];

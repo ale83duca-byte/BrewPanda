@@ -228,7 +228,8 @@ export const SalesOrderView: React.FC<SalesOrderViewProps> = ({ selectedYear, on
                 lotto: item.lotto,
                 formato: item.format,
                 quantita: -quantityToShip,
-                relatedDocId: orderId
+                relatedDocId: orderId,
+                destinatario: selectedClient
             });
 
             // 2. Movement IN to Selected Client (Purchase)
@@ -270,7 +271,7 @@ export const SalesOrderView: React.FC<SalesOrderViewProps> = ({ selectedYear, on
         await saveDataToSheet(selectedYear, 'SALES_ORDERS', updatedOrders);
         await saveDataToSheet(selectedYear, 'BEER_MOVEMENTS', updatedMovements);
 
-        showToast("Commissione d'ordine salvata con successo!", 'success');
+        showToast("Commissione BeerFirm salvata con successo!", 'success');
         onRefresh();
         setView('dashboard');
         // Reset form
@@ -284,7 +285,7 @@ export const SalesOrderView: React.FC<SalesOrderViewProps> = ({ selectedYear, on
     if (view === 'new') {
         return (
             <div className="space-y-4">
-                 <h1 className="text-3xl font-bold text-brew-accent">Nuova Commissione d'Ordine</h1>
+                 <h1 className="text-3xl font-bold text-brew-accent">Nuova Commissione BeerFirm</h1>
                  <div className="bg-brew-dark-secondary p-4 rounded-lg shadow-lg">
                     <div className="grid grid-cols-2 gap-4 mb-4">
                         <Field label="Cliente">
@@ -342,7 +343,7 @@ export const SalesOrderView: React.FC<SalesOrderViewProps> = ({ selectedYear, on
     return (
         <div className="bg-brew-dark-secondary p-4 rounded-lg shadow-lg">
             <div className="flex justify-between items-center mb-4">
-                <h2 className="text-2xl font-bold text-brew-accent">Dashboard Commissioni</h2>
+                <h2 className="text-2xl font-bold text-brew-accent">Commissioni BeerFirm su lotti interni</h2>
                 <button onClick={() => { setEditingOrder(null); setSelectedClient(''); setOrderItems([{ beerName: '', lotto: '', format: '', quantity: '', customBeerName: '' }]); setView('new'); }} className="flex items-center gap-2 bg-brew-green text-white font-bold py-2 px-4 rounded-md hover:bg-opacity-90">
                     <PlusIcon className="w-5 h-5" /> Nuova Commissione
                 </button>

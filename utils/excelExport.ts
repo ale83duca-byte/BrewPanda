@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import type { BreweryData, BrewHeader, Movement, PackagingData, FermentationDataPoint } from '../types';
+import type { BreweryData, BrewHeader, Movement, PackagingData, FermentationDataPoint, PackagedBeerOrder } from '../types';
 
 const headerStyle = { font: { bold: true, color: { rgb: "ECF0F1" } }, fill: { fgColor: { rgb: "34495e" } }, alignment: { horizontal: 'center' } };
 const titleStyle = { font: { bold: true, sz: 18 }, alignment: { horizontal: 'center' } };
@@ -361,6 +361,65 @@ export const exportQuoteToExcel = (
     
     XLSX.utils.book_append_sheet(wb, ws, `Preventivo`);
     XLSX.writeFile(wb, `preventivo_${quoteData.nomeBirra.replace(/ /g, '_')}.xlsx`);
+};
+
+export const exportPackagedBeerOrderToExcel = (order: PackagedBeerOrder) => {
+    const wb = XLSX.utils.book_new();
+    const ws_data: (string | number | null)[][] = [];
+    const styles: { [cell: string]: any } = {};
+
+    // --- HEADER ---
+    ws_data.push(['BIRRIFICIO ALVERESE', null, null, null, 'DESTINATARIO:']);
+    styles[`A${ws_data.length}`] = { font: { bold: true, sz: 14 } };
+    styles[`E${ws_data.length}`] = { font: { bold: true } };
+
+    ws_data.push(['Via Example, 123', null, null, null, order.client]);
+    ws_data.push(['58100 Grosseto (GR)', null, null, null, '']); // Placeholder address
+    ws_data.push(['P.IVA: 01234567890', null, null, null, '']);
+    ws_data.push([], []);
+
+    // --- TITLE & INFO ---
+    ws_data.push(['DOCUMENTO DI TRASPORTO (DDT)']);
+    styles[`A${ws_data.length}`] = { font: { bold: true, sz: 16 }, alignment: { horizontal: 'center' } };
+    ws_data.push([`Numero: ${order.id}`, null, `Data: ${order.date}`]);
+    ws_data.push([], []);
+
+    // --- ITEMS TABLE ---
+    ws_data.push(['Descrizione', 'Lotto', 'Formato', 'Q.tà', 'Prezzo Unit.', 'Totale']);
+    ['A','B','C','D','E','F'].forEach(c => styles[`${c}${ws_data.length}`] = headerStyle);
+
+    order.items.forEach(item => {
+        ws_data.push([
+            item.beerName,
+            item.lotto,
+            item.format,
+            item.quantity,
+            item.price,
+            item.total
+        ]);
+    });
+    ws_data.push([], []);
+
+    // --- TOTALS ---
+    ws_data.push([null, null, null, null, 'Totale Netto:', order.totalNet]);
+    styles[`E${ws_data.length}`] = totalLabelStyle; styles[`F${ws_data.length}`] = totalValueStyle;
+
+    ws_data.push([null, null, null, null, 'IVA (22%):', order.iva]);
+    styles[`E${ws_data.length}`] = totalLabelStyle; styles[`F${ws_data.length}`] = totalValueStyle;
+
+    ws_data.push([null, null, null, null, 'TOTALE DOCUMENTO:', order.totalGross]);
+    styles[`E${ws_data.length}`] = { font: { bold: true, sz: 12 }, alignment: { horizontal: 'right' } };
+    styles[`F${ws_data.length}`] = { font: { bold: true, sz: 14 } };
+
+    const ws = XLSX.utils.aoa_to_sheet(ws_data);
+    ws['!cols'] = getColumnWidths(ws_data);
+    ws['!merges'] = [
+        { s: { r: 6, c: 0 }, e: { r: 6, c: 5 } } // Title merge
+    ];
+    applyStylesToSheet(ws, styles);
+
+    XLSX.utils.book_append_sheet(wb, ws, `DDT_${order.id}`);
+    XLSX.writeFile(wb, `DDT_${order.client.replace(/ /g, '_')}_${order.date.replace(/\//g, '-')}.xlsx`);
 };
 
 export const exportAllDataToExcel = (allData: Record<string, BreweryData>) => {
