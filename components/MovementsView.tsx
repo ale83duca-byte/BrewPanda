@@ -16,15 +16,25 @@ export const MovementsView: React.FC<MovementsViewProps> = ({ selectedYear, sear
     const [movements, setMovements] = useState<MovementWithIndex[]>([]);
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number; movementIndex: number } | null>(null);
     const [editingMovement, setEditingMovement] = useState<MovementWithIndex | null>(null);
-    const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' }>({ key: 'DATA', direction: 'desc' });
 
     useEffect(() => {
         const loadMovements = async () => {
             const data = await getSheetData(selectedYear, 'MOVIMENTAZIONE');
-            const allMovements = (data as Movement[])
+            let allMovements = (data as Movement[])
                 .map((mov, index) => ({ ...mov, originalIndex: index }))
                 .filter(mov => mov.N_FATTURA !== 'RIPORTO_ANNO_PREC');
             
+            // Sort chronologically by DATA
+            allMovements.sort((a, b) => {
+                try {
+                    const dateA = a.DATA ? new Date(a.DATA.split('/').reverse().join('-')).getTime() : 0;
+                    const dateB = b.DATA ? new Date(b.DATA.split('/').reverse().join('-')).getTime() : 0;
+                    return dateA - dateB;
+                } catch {
+                    return 0;
+                }
+            });
+
             if (searchTerm) {
                 const lowercasedFilter = searchTerm.toLowerCase();
                 const filtered = allMovements.filter(item => {
@@ -40,37 +50,6 @@ export const MovementsView: React.FC<MovementsViewProps> = ({ selectedYear, sear
 
         loadMovements();
     }, [selectedYear, searchTerm, onRefresh]);
-
-    const sortedMovements = React.useMemo(() => {
-        let sortableItems = [...movements];
-        if (sortConfig.key === 'DATA') {
-            sortableItems.sort((a, b) => {
-                try {
-                    const dateA = a.DATA ? new Date(a.DATA.split('/').reverse().join('-')).getTime() : 0;
-                    const dateB = b.DATA ? new Date(b.DATA.split('/').reverse().join('-')).getTime() : 0;
-                    
-                    if (dateA < dateB) {
-                        return sortConfig.direction === 'asc' ? -1 : 1;
-                    }
-                    if (dateA > dateB) {
-                        return sortConfig.direction === 'asc' ? 1 : -1;
-                    }
-                    return 0;
-                } catch {
-                    return 0;
-                }
-            });
-        }
-        return sortableItems;
-    }, [movements, sortConfig]);
-
-    const requestSort = (key: string) => {
-        let direction: 'asc' | 'desc' = 'asc';
-        if (sortConfig.key === key && sortConfig.direction === 'asc') {
-            direction = 'desc';
-        }
-        setSortConfig({ key, direction });
-    };
 
     const handleContextMenu = (e: React.MouseEvent, movementIndex: number) => {
         e.preventDefault();
@@ -104,16 +83,15 @@ export const MovementsView: React.FC<MovementsViewProps> = ({ selectedYear, sear
                                 <th 
                                     key={col} 
                                     scope="col" 
-                                    className={`px-4 py-3 ${col === 'DATA' ? 'cursor-pointer hover:text-white' : ''}`}
-                                    onClick={() => col === 'DATA' && requestSort('DATA')}
+                                    className="px-4 py-3"
                                 >
-                                    {col} {col === 'DATA' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                                    {col}
                                 </th>
                             ))}
                         </tr>
                     </thead>
                     <tbody>
-                        {sortedMovements.map((mov) => (
+                        {movements.map((mov) => (
                             <tr 
                                 key={mov.originalIndex} 
                                 className={`border-b border-slate-700 hover:bg-slate-600 ${isLoadMovement(mov) ? 'cursor-pointer' : 'cursor-context-menu'}`}

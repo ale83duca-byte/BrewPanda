@@ -7,9 +7,10 @@ import { parseItalianDate } from '../utils/dateUtils';
 
 interface CantinaViewProps {
     selectedYear: string;
+    onOpenLotto: (lottoId: string) => void;
 }
 
-export const CantinaView: React.FC<CantinaViewProps> = ({ selectedYear }) => {
+export const CantinaView: React.FC<CantinaViewProps> = ({ selectedYear, onOpenLotto }) => {
     const [fermenters, setFermenters] = useState<FermenterConfig[]>([]);
     const [cotte, setCotte] = useState<BrewHeader[]>([]);
     const [packaging, setPackaging] = useState<PackagingData[]>([]);
@@ -173,7 +174,15 @@ export const CantinaView: React.FC<CantinaViewProps> = ({ selectedYear }) => {
                     const latestTemp = activeLot ? latestTemperaturesByLotto[activeLot.LOTTO] : undefined;
                     
                     return (
-                        <div key={ferm.id} className={`border-2 rounded-lg shadow-lg flex flex-col ${statusClasses[status]}`}>
+                        <div 
+                            key={ferm.id} 
+                            className={`border-2 rounded-lg shadow-lg flex flex-col ${statusClasses[status]} ${activeLot ? 'cursor-pointer hover:opacity-90' : ''}`}
+                            onDoubleClick={() => {
+                                if (activeLot) {
+                                    onOpenLotto(activeLot.LOTTO);
+                                }
+                            }}
+                        >
                            <div className="p-3 bg-black/20">
                              <h3 className="text-lg font-bold text-center">{ferm.nome}</h3>
                              <p className="text-xs text-center text-slate-400">{ferm.capacita} Litri</p>

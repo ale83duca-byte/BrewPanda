@@ -319,7 +319,6 @@ export const checkAndProcessWarehouseStatus = async (year: string): Promise<Ware
         uniqueLotsWithScadenza.set(`${m.NOME.toUpperCase()}|${m.LOTTO_FORNITORE.toUpperCase()}`, m);
     });
 
-    const newDischargeMovements: Movement[] = [];
     const dischargedItems: WarehouseStatus['dischargedItems'] = [];
     const expiringSoonItems: WarehouseStatus['expiringSoonItems'] = [];
 
@@ -331,25 +330,14 @@ export const checkAndProcessWarehouseStatus = async (year: string): Promise<Ware
         scadenzaDate.setHours(0,0,0,0);
         const diffDays = Math.ceil((scadenzaDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
-        if (diffDays < 0) {
-            const dischargeMovement: Movement = {
-                DATA: today.toLocaleDateString('it-IT'), TIPOLOGIA: movement.TIPOLOGIA, NOME: movement.NOME,
-                MARCA: movement.MARCA, FORNITORE: movement.FORNITORE, KG_LITRI_PZ: -stock,
-                N_FATTURA: `SCADENZA_AUTO_${Date.now()}`, LOTTO_FORNITORE: movement.LOTTO_FORNITORE,
-                LOTTO_PRODUZIONE: 'OLTRE LA DATA DI SCADENZA',
-            };
-            newDischargeMovements.push(dischargeMovement);
-            dischargedItems.push({ nome: movement.NOME, lotto: movement.LOTTO_FORNITORE, qta: stock });
-        } else if (diffDays <= 30) {
+        if (diffDays <= 30) {
+            // Keep both expired and expiring soon items here. 
+            // The UI will handle highlighting expired items in red.
             expiringSoonItems.push({ nome: movement.NOME, lotto: movement.LOTTO_FORNITORE, scadenza: movement.DATA_SCADENZA!, giacenza: stock });
         }
     });
 
-    if (newDischargeMovements.length > 0) {
-        await addMovementsAndSync(year, newDischargeMovements);
-    }
-    
-    const finalData = await getBreweryData(year) || data;
+    const finalData = data;
     
     // Custom calculation to find out-of-stock items, since syncWithMovements now filters them out.
     const warehouseMap = new Map<string, number>();

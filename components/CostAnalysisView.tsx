@@ -89,7 +89,16 @@ export const CostAnalysisView: React.FC<CostAnalysisViewProps> = ({ selectedYear
 
     const handleConfirmCloseAnalysis = async () => {
         if (!selectedLotto) return;
-        const updatedLotto = { ...selectedLotto, isCostAnalysisClosed: true };
+        const updatedLotto = { 
+            ...selectedLotto, 
+            isCostAnalysisClosed: true,
+            savedCostAnalysis: {
+                rawMaterialsCosts,
+                otherCosts,
+                analysisSummary,
+                packagingAnalysis
+            }
+        };
         await upsertItemInSheet(selectedYear, 'COTTE_HEAD', updatedLotto, 'LOTTO');
         setSelectedLotto(updatedLotto);
         setConfirmCloseModalOpen(false);
@@ -98,6 +107,11 @@ export const CostAnalysisView: React.FC<CostAnalysisViewProps> = ({ selectedYear
 
     const rawMaterialsCosts = useMemo(() => {
         if (!selectedLotto) return null;
+        if (selectedLotto.isCostAnalysisClosed && selectedLotto.savedCostAnalysis?.rawMaterialsCosts) {
+            return selectedLotto.savedCostAnalysis.rawMaterialsCosts;
+        }
+
+        const currentPriceDb = selectedLotto.frozenPrices || priceDb;
 
         const ingredientMovements = movements.filter(m => 
             m.LOTTO_PRODUZIONE === selectedLotto.LOTTO && 
@@ -115,7 +129,7 @@ export const CostAnalysisView: React.FC<CostAnalysisViewProps> = ({ selectedYear
             const movMarca = (m.MARCA || '').toUpperCase();
             const movFornitore = (m.FORNITORE || '').toUpperCase();
 
-            const priceItem = priceDb.find(p => p.NOME === movNome && p.MARCA === movMarca && p.FORNITORE === movFornitore);
+            const priceItem = currentPriceDb.find(p => p.NOME === movNome && p.MARCA === movMarca && p.FORNITORE === movFornitore);
             const unitPrice = priceItem ? priceItem.PREZZO : 0;
             const totalCost = quantity * unitPrice;
 
@@ -132,28 +146,33 @@ export const CostAnalysisView: React.FC<CostAnalysisViewProps> = ({ selectedYear
 
     const otherCosts = useMemo(() => {
         if (!selectedLotto) return null;
+        if (selectedLotto.isCostAnalysisClosed && selectedLotto.savedCostAnalysis?.otherCosts) {
+            return selectedLotto.savedCostAnalysis.otherCosts;
+        }
         
+        const currentCoeffs = selectedLotto.frozenCoeffs || coeffs;
+
         const gasCotta = parseFloat(selectedLotto.GAS_COTTA?.replace(',', '.') || '0');
         const gasConfezionamento = parseFloat(selectedLotto.GAS_CONFEZIONAMENTO?.replace(',', '.') || '0');
         const gasUsed = gasCotta + gasConfezionamento;
 
-        const gasPrice = gasType === 'gpl' ? (coeffs.prezzo_gpl_mc || 0) : (coeffs.prezzo_metano_mc || 0);
+        const gasPrice = gasType === 'gpl' ? (currentCoeffs.prezzo_gpl_mc || 0) : (currentCoeffs.prezzo_metano_mc || 0);
         const gasCost = gasUsed * gasPrice;
 
-        const co2Cost = selectedLotto.FLAG_CO2 ? (coeffs.costo_co2 || 0) : 0;
-        const azotoCost = selectedLotto.FLAG_AZOTO ? (coeffs.costo_azoto || 0) : 0;
+        const co2Cost = selectedLotto.FLAG_CO2 ? (currentCoeffs.costo_co2 || 0) : 0;
+        const azotoCost = selectedLotto.FLAG_AZOTO ? (currentCoeffs.costo_azoto || 0) : 0;
         const additionalGasesCost = co2Cost + azotoCost;
 
         const totalLitersPackaged = packaging.filter(p => p.LOTTO_PROD === selectedLotto.LOTTO).reduce((sum, p) => sum + p.LITRI_TOT, 0);
         const hectolitersPackaged = totalLitersPackaged / 100;
         const plato = parseFloat(selectedLotto.PLATO_INIZIALE?.replace(',', '.') || '0');
-        const exciseCoefficient = coeffs.coefficiente_accise || 0;
+        const exciseCoefficient = currentCoeffs.coefficiente_accise || 0;
         const exciseDutyCost = plato * hectolitersPackaged * exciseCoefficient;
         
-        const storageCost = useStorage ? (coeffs.spese_stoccaggio || 0) : 0;
+        const storageCost = useStorage ? (currentCoeffs.spese_stoccaggio || 0) : 0;
         const epalCountNum = epalCount || 0;
-        const epalTotalCost = epalCountNum * (coeffs.costo_epal || 0);
-        const managementCost = totalLitersPackaged * (coeffs.spese_gestione_litro || 0);
+        const epalTotalCost = epalCountNum * (currentCoeffs.costo_epal || 0);
+        const managementCost = totalLitersPackaged * (currentCoeffs.spese_gestione_litro || 0);
 
         const total = gasCost + additionalGasesCost + exciseDutyCost + storageCost + epalTotalCost + managementCost;
 
@@ -162,8 +181,8 @@ export const CostAnalysisView: React.FC<CostAnalysisViewProps> = ({ selectedYear
             additionalGases: { co2: co2Cost, azoto: azotoCost, total: additionalGasesCost },
             exciseDuty: { plato, hl: hectolitersPackaged, coeff: exciseCoefficient, total: exciseDutyCost },
             storage: { total: storageCost },
-            epal: { count: epalCountNum, price: coeffs.costo_epal || 0, total: epalTotalCost },
-            management: { liters: totalLitersPackaged, coeff: coeffs.spese_gestione_litro || 0, total: managementCost },
+            epal: { count: epalCountNum, price: currentCoeffs.costo_epal || 0, total: epalTotalCost },
+            management: { liters: totalLitersPackaged, coeff: currentCoeffs.spese_gestione_litro || 0, total: managementCost },
             grandTotal: total
         };
 
@@ -171,6 +190,9 @@ export const CostAnalysisView: React.FC<CostAnalysisViewProps> = ({ selectedYear
     
     const analysisSummary = useMemo(() => {
         if (!selectedLotto) return null;
+        if (selectedLotto.isCostAnalysisClosed && selectedLotto.savedCostAnalysis?.analysisSummary) {
+            return selectedLotto.savedCostAnalysis.analysisSummary;
+        }
 
         const totalLitersPackaged = packaging.filter(p => p.LOTTO_PROD === selectedLotto.LOTTO).reduce((sum, p) => sum + p.LITRI_TOT, 0);
         const grandTotal = (rawMaterialsCosts?.grandTotal || 0) + (otherCosts?.grandTotal || 0);
@@ -181,7 +203,13 @@ export const CostAnalysisView: React.FC<CostAnalysisViewProps> = ({ selectedYear
 
     const packagingAnalysis = useMemo(() => {
         if (!selectedLotto || !analysisSummary || analysisSummary.beerPricePerLiter === 0) return null;
+        if (selectedLotto.isCostAnalysisClosed && selectedLotto.savedCostAnalysis?.packagingAnalysis) {
+            return selectedLotto.savedCostAnalysis.packagingAnalysis;
+        }
         
+        const currentPriceDb = selectedLotto.frozenPrices || priceDb;
+        const currentCoeffs = selectedLotto.frozenCoeffs || coeffs;
+
         const lottoPackaging = packaging.filter(p => p.LOTTO_PROD === selectedLotto.LOTTO);
         const uniqueFormats = [...new Set(lottoPackaging.map(p => p.FORMATO))];
 
@@ -196,12 +224,12 @@ export const CostAnalysisView: React.FC<CostAnalysisViewProps> = ({ selectedYear
             const totalKegs = lottoPackaging.filter(p => p.FORMATO === formato).reduce((sum, p) => sum + p.QTA_UNITA, 0);
 
             const isSteelKeg = formato.toUpperCase().includes('ACCIAIO');
-            let containerUnitCost = 0;
+            let containerUnitCost;
 
             if (isSteelKeg) {
-                containerUnitCost = coeffs.costo_lavaggio_fusto_acciaio || 0;
+                containerUnitCost = currentCoeffs.costo_lavaggio_fusto_acciaio || 0;
             } else {
-                const priceItem = priceDb.find(p => p.NOME === config.nomeInvCont);
+                const priceItem = currentPriceDb.find(p => p.NOME === config.nomeInvCont);
                 containerUnitCost = priceItem ? priceItem.PREZZO : 0;
             }
             
@@ -218,7 +246,7 @@ export const CostAnalysisView: React.FC<CostAnalysisViewProps> = ({ selectedYear
         }).filter(Boolean);
 
         // --- BOTTLE CALCULATION ---
-        const allCapsPrices = priceDb.filter(p => p.NOME.toUpperCase().includes('TAPPO CORONA'));
+        const allCapsPrices = currentPriceDb.filter(p => p.NOME.toUpperCase().includes('TAPPO CORONA'));
         allCapsPrices.sort((a, b) => {
              const dateA = new Date(a.DATA_ULTIMO_CARICO.split('/').reverse().join('-')).getTime();
              const dateB = new Date(b.DATA_ULTIMO_CARICO.split('/').reverse().join('-')).getTime();
@@ -239,17 +267,17 @@ export const CostAnalysisView: React.FC<CostAnalysisViewProps> = ({ selectedYear
 
             const beerCost = analysisSummary.beerPricePerLiter * config.litriUnit;
             
-            const bottlePriceItem = priceDb.find(p => p.NOME === config.nomeInvCont);
+            const bottlePriceItem = currentPriceDb.find(p => p.NOME === config.nomeInvCont);
             const bottleCost = bottlePriceItem ? bottlePriceItem.PREZZO : 0;
 
             let cartonCostPerBottle = 0;
             if (config.nomeInvScatola) {
-                const cartonPriceItem = priceDb.find(p => p.NOME === config.nomeInvScatola);
+                const cartonPriceItem = currentPriceDb.find(p => p.NOME === config.nomeInvScatola);
                 const cartonCost = cartonPriceItem ? cartonPriceItem.PREZZO : 0;
                 cartonCostPerBottle = config.pezziPerCartone > 0 ? cartonCost / config.pezziPerCartone : 0;
             }
 
-            const labelCost = useLabels ? (coeffs.costo_etichetta || 0) : 0;
+            const labelCost = useLabels ? (currentCoeffs.costo_etichetta || 0) : 0;
             const finalPricePerBottle = beerCost + bottleCost + capPrice + cartonCostPerBottle + labelCost;
             const totalCostForFormat = finalPricePerBottle * totalBottles;
 

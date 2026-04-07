@@ -84,8 +84,8 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
     };
     
     const isLottoClosed = useMemo(() => {
-        return !!lottoId && !header.FERMENTATORE;
-    }, [lottoId, header.FERMENTATORE]);
+        return (!!lottoId && !header.FERMENTATORE) || header.isCostAnalysisClosed;
+    }, [lottoId, header.FERMENTATORE, header.isCostAnalysisClosed]);
 
     const birreClienteSelezionato = useMemo(() => {
         const clienteSelezionato = clienti.find(c => c.nome === header.CLIENTE);
@@ -640,8 +640,19 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
             return;
         }
         
+        const data = await getBreweryData(selectedYear);
+        if (!data) {
+            showToast("Errore nel caricamento dei dati per l'analisi costi.", 'error');
+            return;
+        }
+
         const fermenterToFree = header.FERMENTATORE;
-        const updatedHeader = { ...header, FERMENTATORE: '' };
+        const updatedHeader = { 
+            ...header, 
+            FERMENTATORE: '',
+            frozenPrices: data.PRICE_DATABASE || [],
+            frozenCoeffs: data.COST_COEFFICIENTS || {}
+        };
         await upsertItemInSheet(selectedYear, 'COTTE_HEAD', updatedHeader, 'LOTTO');
         setHeader(updatedHeader);
         showToast(`Lotto ${header.LOTTO} chiuso. Il fermentatore ${fermenterToFree} è ora libero.`, 'success');

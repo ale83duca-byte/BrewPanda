@@ -73,6 +73,14 @@ export interface BrewHeader {
   costAnalysisEpalCount?: number;
   isCostAnalysisClosed?: boolean;
   costAnalysisUseLabels?: boolean;
+  savedCostAnalysis?: {
+    rawMaterialsCosts: any;
+    otherCosts: any;
+    analysisSummary: any;
+    packagingAnalysis: any;
+  };
+  frozenPrices?: PriceDBItem[];
+  frozenCoeffs?: any;
 }
 
 export interface FermentationDataPoint {

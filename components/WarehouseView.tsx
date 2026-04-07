@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { getBreweryData, updatePriceInDb } from '../services/dataService';
-import type { PriceDBItem, RawWarehouseItem } from '../types';
+import type { PriceDBItem, RawWarehouseItem, WarehouseStatus } from '../types';
 import { TIPOLOGIE_PRODOTTI } from '../constants';
 import { useToast } from '../hooks/useToast';
 
+import { parseItalianDate } from '../utils/dateUtils';
+
 interface WarehouseViewProps {
     selectedYear: string;
+    warehouseStatus?: WarehouseStatus;
 }
 
 interface DetailedWarehouseItem {
@@ -18,7 +21,7 @@ interface DetailedWarehouseItem {
 
 const ALL_CATEGORIES = "TUTTO";
 
-export const WarehouseView: React.FC<WarehouseViewProps> = ({ selectedYear }) => {
+export const WarehouseView: React.FC<WarehouseViewProps> = ({ selectedYear, warehouseStatus }) => {
     const [rawWarehouse, setRawWarehouse] = useState<RawWarehouseItem[]>([]);
     const [priceDb, setPriceDb] = useState<PriceDBItem[]>([]);
     const [filter, setFilter] = useState<string>(ALL_CATEGORIES);
@@ -123,10 +126,17 @@ export const WarehouseView: React.FC<WarehouseViewProps> = ({ selectedYear }) =>
                              const key = `${item.TIPOLOGIA}|${item.NOME}|${item.MARCA}|${item.FORNITORE}`;
                              const priceItem = priceDb.find(p => p.NOME === item.NOME && p.MARCA === item.MARCA && p.FORNITORE === item.FORNITORE);
                              const isEditing = editingItemKey === key;
+                             
+                             // Check if item has expired lots
+                             const hasExpiredLots = warehouseStatus?.expiringSoonItems.some(
+                                 expItem => expItem.nome === item.NOME && 
+                                 (parseItalianDate(expItem.scadenza)?.getTime() || 0) < new Date().setHours(0,0,0,0)
+                             );
+
                             return (
-                                <tr key={index} className="border-b border-slate-700 hover:bg-slate-600">
+                                <tr key={index} className={`border-b border-slate-700 hover:bg-slate-600 ${hasExpiredLots ? 'bg-red-900/30 text-red-200' : ''}`}>
                                     <td className="px-6 py-4">{item.TIPOLOGIA}</td>
-                                    <td className="px-6 py-4 font-medium">{item.NOME}</td>
+                                    <td className="px-6 py-4 font-medium">{item.NOME} {hasExpiredLots && <span className="text-red-400 text-xs ml-2">(Scaduto)</span>}</td>
                                     <td className="px-6 py-4">{item.MARCA || '-'}</td>
                                     <td className="px-6 py-4">{item.FORNITORE || '-'}</td>
                                     <td className="px-6 py-4 font-bold text-right">{item.GIACENZA.toFixed(2)}</td>

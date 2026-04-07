@@ -269,9 +269,9 @@ export default function App() {
             case 'MOVEMENTS':
                 return <MovementsView key={`${selectedYear}-${refreshKey}`} selectedYear={selectedYear} searchTerm={searchTerm} onRefresh={handleRefresh} />;
             case 'WAREHOUSE':
-                return <WarehouseView key={`${selectedYear}-${refreshKey}`} selectedYear={selectedYear} />;
+                return <WarehouseView key={`${selectedYear}-${refreshKey}`} selectedYear={selectedYear} warehouseStatus={warehouseStatus || undefined} />;
             case 'CANTINA':
-                return <CantinaView key={`${selectedYear}-${refreshKey}`} selectedYear={selectedYear} />;
+                return <CantinaView key={`${selectedYear}-${refreshKey}`} selectedYear={selectedYear} onOpenLotto={handleOpenLotto} />;
             case 'BREW_PAGE':
                 return <BrewPage key={`${selectedYear}-${editingLottoId || 'new'}-${refreshKey}`} selectedYear={selectedYear} lottoId={editingLottoId} onExit={() => setActiveView('HOME')} onSaveNewLotto={handleSaveNewLotto} />;
             case 'DATABASE':
