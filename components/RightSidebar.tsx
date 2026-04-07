@@ -76,7 +76,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ selectedYear, refres
                 <div className="space-y-2 mb-6">
                      <Button onClick={() => onNavigate('COST_ANALYSIS')} icon={null} label={t('rightSidebar.batchCostButton')} className="bg-brew-orange py-3" textClassName="text-base" />
                      <Button onClick={() => onNavigate('PRODUCTION_TREND')} icon={null} label={t('rightSidebar.productionTrendButton')} className="bg-teal-600 hover:bg-teal-500" />
-                     <Button onClick={() => onNavigate('QUOTES_LIST')} icon={null} label="Commissioni BeerFirm su lotti interni" className="bg-brew-blue py-3" textClassName="text-base" />
+                     <Button onClick={() => onNavigate('QUOTES_LIST')} icon={null} label="Preventivi" className="bg-brew-blue py-3" textClassName="text-base" />
                 </div>
 
                 <div className="border-t border-slate-700 pt-4">

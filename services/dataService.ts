@@ -507,12 +507,14 @@ export const saveCottaAndPackaging = async (year: string, {
     header,
     ingredientMovements,
     packagingMovements,
-    newPackagingData
+    newPackagingData,
+    replaceIngredients = false
 }: {
     header: BrewHeader;
     ingredientMovements: Movement[];
     packagingMovements: Movement[];
     newPackagingData: PackagingData[];
+    replaceIngredients?: boolean;
 }) => {
     const data = await getBreweryData(year) || getDefaultData();
 
@@ -524,7 +526,14 @@ export const saveCottaAndPackaging = async (year: string, {
         data.COTTE_HEAD.push(header);
     }
 
-    // 2. Add all new movements
+    // 2. Replace ingredient movements if requested
+    if (replaceIngredients) {
+        data.MOVIMENTAZIONE = data.MOVIMENTAZIONE.filter(m => 
+            !(m.LOTTO_PRODUZIONE === header.LOTTO && m.N_FATTURA.startsWith('SCARICO_COTTA_'))
+        );
+    }
+
+    // 3. Add all new movements
     data.MOVIMENTAZIONE.push(...ingredientMovements, ...packagingMovements);
 
     // 3. Add new packaging data

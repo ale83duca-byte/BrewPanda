@@ -20,6 +20,7 @@ interface ProductionSummaryRow {
     cliente: string;
     lotto: string;
     litriContaMosto: string;
+    plato: string;
     gasUtilizzato: string;
     tipologia: string;
     litriProdotti: string;
@@ -130,6 +131,7 @@ export const Home: React.FC<HomeProps> = ({ warehouseStatus, selectedYear, onRef
                     cliente: cotta.CLIENTE,
                     lotto: cotta.LOTTO,
                     litriContaMosto: litriContaMostoCalc > 0 ? litriContaMostoCalc.toFixed(1) : 'N/D',
+                    plato: cotta.PLATO_INIZIALE || 'N/D',
                     gasUtilizzato: gasTotale > 0 ? gasTotale.toFixed(2) : 'N/D',
                     tipologia: cotta.NOME_BIRRA,
                     litriProdotti: cotta.LITRI_FINALI,
@@ -215,6 +217,7 @@ export const Home: React.FC<HomeProps> = ({ warehouseStatus, selectedYear, onRef
                                 <th className="px-3 py-3">{t('home.clientColumn')}</th>
                                 <th className="px-3 py-3">{t('home.lottoColumn')}</th>
                                 <th className="px-3 py-3 text-right w-32">{t('home.mustCounterColumn')}</th>
+                                <th className="px-3 py-3 text-right">PLATO</th>
                                 <th className="px-3 py-3 text-right">{t('home.gasColumn')}</th>
                                 <th className="px-3 py-3">{t('home.typeColumn')}</th>
                                 <th className="px-3 py-3 text-right">{t('home.litersProdColumn')}</th>
@@ -232,6 +235,7 @@ export const Home: React.FC<HomeProps> = ({ warehouseStatus, selectedYear, onRef
                                     <td className="px-3 py-2">{row.cliente}</td>
                                     <td className="px-3 py-2 font-semibold text-brew-accent">{row.lotto}</td>
                                     <td className="px-3 py-2 text-right font-medium text-yellow-300">{row.litriContaMosto}</td>
+                                    <td className="px-3 py-2 text-right font-medium text-purple-300">{row.plato}</td>
                                     <td className="px-3 py-2 text-right font-medium text-cyan-300">{row.gasUtilizzato}</td>
                                     <td className="px-3 py-2">{row.tipologia}</td>
                                     <td className="px-3 py-2 text-right font-medium">{row.litriProdotti}</td>

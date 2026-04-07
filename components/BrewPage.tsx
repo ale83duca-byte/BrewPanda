@@ -376,7 +376,7 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
 
         // Ingredient movements
         const ingredientMovements = ingredients
-            .filter(ing => !ing.gia_scaricato && ing.nome && ing.qta && ing.lotto_fornitore)
+            .filter(ing => ing.nome && ing.qta && ing.lotto_fornitore)
             .map(ing => {
                 const lots = ingredientLotsStock[ing.nome.toUpperCase()] || [];
                 const lotInfo = lots.find(l => l.lotto === ing.lotto_fornitore.toUpperCase());
@@ -387,7 +387,7 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
                     MARCA: lotInfo?.marca || 'N/D',
                     FORNITORE: lotInfo?.fornitore || 'N/D',
                     KG_LITRI_PZ: -parseFloat(ing.qta.replace(',', '.')),
-                    N_FATTURA: '',
+                    N_FATTURA: `SCARICO_COTTA_${upperLotto}`,
                     LOTTO_FORNITORE: ing.lotto_fornitore,
                     LOTTO_PRODUZIONE: upperLotto,
                 } as Movement;
@@ -418,7 +418,8 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
             header: updatedHeader,
             ingredientMovements,
             packagingMovements,
-            newPackagingData
+            newPackagingData,
+            replaceIngredients: true // Replace all existing ingredient movements for this lot
         });
 
 
