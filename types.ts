@@ -146,14 +146,19 @@ export interface CostCoefficients {
 
 export interface QuoteIngredient {
     id: number;
-    priceDbId: string;
+    nome: string;
     qta: string;
+    prezzoUnitario: string;
 }
 
 export interface QuotePackaging {
     id: number;
+    nome: string;
     formato: string;
     qta: string;
+    costoContenitore: string;
+    costoScatola: string;
+    costoTappo: string;
 }
 
 export interface Quote {

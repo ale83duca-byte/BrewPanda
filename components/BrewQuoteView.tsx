@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getBreweryData, upsertItemInSheet } from '../services/dataService';
-import type { PriceDBItem, CostCoefficients, Cliente, Quote, DatabaseItem } from '../types';
+import type { CostCoefficients, Cliente, Quote } from '../types';
 import { useTranslation } from '../i18n';
 import { ArrowUturnLeftIcon, PlusIcon, TrashIcon } from './icons';
 import { CONFIG_PACKAGING } from '../constants';
@@ -15,23 +15,24 @@ interface BrewQuoteViewProps {
 
 interface QuoteIngredient {
     id: number;
-    priceDbId: string; // "NOME|MARCA|FORNITORE"
+    nome: string;
     qta: string;
+    prezzoUnitario: string;
 }
 
 interface QuotePackaging {
     id: number;
+    nome: string;
     formato: string;
     qta: string;
+    costoContenitore: string;
+    costoScatola: string;
+    costoTappo: string;
 }
-
-const ingredientCategories = ["MALTI", "LUPPOLI", "LIEVITI", "ADDITIVI", "SANIFICANTI"];
 
 export const BrewQuoteView: React.FC<BrewQuoteViewProps> = ({ selectedYear, quoteId, onExit }) => {
     const { t } = useTranslation();
     const { showToast } = useToast();
-    const [priceDb, setPriceDb] = useState<PriceDBItem[]>([]);
-    const [database, setDatabase] = useState<DatabaseItem[]>([]);
     const [coeffs, setCoeffs] = useState<CostCoefficients>({});
     const [clienti, setClienti] = useState<Cliente[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -59,8 +60,6 @@ export const BrewQuoteView: React.FC<BrewQuoteViewProps> = ({ selectedYear, quot
             setIsLoading(true);
             const data = await getBreweryData(selectedYear);
             if (data) {
-                setPriceDb(data.PRICE_DATABASE || []);
-                setDatabase(data.DATABASE || []);
                 setCoeffs(data.COST_COEFFICIENTS || {});
                 setClienti(data.CLIENTI || []);
 
@@ -99,55 +98,38 @@ export const BrewQuoteView: React.FC<BrewQuoteViewProps> = ({ selectedYear, quot
     };
     
     // Ingredient Handlers
-    const addIngredient = () => setIngredients(prev => [...prev, { id: Date.now(), priceDbId: '', qta: '' }]);
+    const addIngredient = () => setIngredients(prev => [...prev, { id: Date.now(), nome: '', qta: '', prezzoUnitario: '' }]);
     const removeIngredient = (id: number) => setIngredients(prev => prev.filter(i => i.id !== id));
-    const updateIngredient = (id: number, field: 'priceDbId' | 'qta', value: string) => {
+    const updateIngredient = (id: number, field: keyof QuoteIngredient, value: string) => {
         setIngredients(prev => prev.map(i => i.id === id ? {...i, [field]: value} : i));
     };
     
     // Packaging Handlers
-    const addPackaging = () => setPackaging(prev => [...prev, { id: Date.now(), formato: '', qta: '' }]);
+    const addPackaging = () => setPackaging(prev => [...prev, { id: Date.now(), nome: '', formato: '', qta: '', costoContenitore: '', costoScatola: '', costoTappo: '' }]);
     const removePackaging = (id: number) => setPackaging(prev => prev.filter(p => p.id !== id));
-    const updatePackaging = (id: number, field: 'formato' | 'qta', value: string) => {
+    const updatePackaging = (id: number, field: keyof QuotePackaging, value: string) => {
         setPackaging(prev => prev.map(p => p.id === id ? {...p, [field]: value} : p));
     };
-
-    const ingredientPriceDb = useMemo(() => {
-        const ingredientItems = new Set(
-            database
-                .filter(item => ingredientCategories.includes(item.TIPOLOGIA))
-                .map(item => `${item.NOME}|${item.MARCA}|${item.FORNITORE}`)
-        );
-        return priceDb.filter(p => ingredientItems.has(`${p.NOME}|${p.MARCA}|${p.FORNITORE}`));
-    }, [priceDb, database]);
-    
-    const priceDbMap = useMemo(() => {
-        const map = new Map<string, PriceDBItem>();
-        priceDb.forEach(item => {
-            map.set(`${item.NOME}|${item.MARCA}|${item.FORNITORE}`, item);
-        });
-        return map;
-    }, [priceDb]);
 
     const rawMaterialsCosts = useMemo(() => {
         const costs: any[] = [];
         let grandTotal = 0;
         ingredients.forEach(ing => {
-            const priceItem = priceDbMap.get(ing.priceDbId);
             const qta = parseFloat(ing.qta.replace(',', '.')) || 0;
-            if(priceItem && qta > 0) {
-                const totalCost = priceItem.PREZZO * qta;
+            const prezzoUnitario = parseFloat(ing.prezzoUnitario.replace(',', '.')) || 0;
+            if(ing.nome && qta > 0) {
+                const totalCost = prezzoUnitario * qta;
                 costs.push({
-                    nome: priceItem.NOME,
+                    nome: ing.nome,
                     qta: qta,
-                    prezzoUnitario: priceItem.PREZZO,
+                    prezzoUnitario: prezzoUnitario,
                     costoTotale: totalCost,
                 });
                 grandTotal += totalCost;
             }
         });
         return { items: costs, grandTotal };
-    }, [ingredients, priceDbMap]);
+    }, [ingredients]);
 
     const totalPackagedLiters = useMemo(() => {
         return packaging.reduce((acc, pkg) => {
@@ -201,10 +183,6 @@ export const BrewQuoteView: React.FC<BrewQuoteViewProps> = ({ selectedYear, quot
         
         const kegs: any[] = [];
         const bottles: any[] = [];
-
-        const allCapsPrices = priceDb.filter(p => p.NOME.toUpperCase().includes('TAPPO CORONA'));
-        allCapsPrices.sort((a, b) => new Date(b.DATA_ULTIMO_CARICO.split('/').reverse().join('-')).getTime() - new Date(a.DATA_ULTIMO_CARICO.split('/').reverse().join('-')).getTime());
-        const capPrice = allCapsPrices.length > 0 ? allCapsPrices[0].PREZZO : 0;
         
         packaging.forEach(pkg => {
             const qta = parseInt(pkg.qta) || 0;
@@ -214,13 +192,11 @@ export const BrewQuoteView: React.FC<BrewQuoteViewProps> = ({ selectedYear, quot
             if (!config) return;
 
             if (pkg.formato.toUpperCase().includes('FUSTO') || pkg.formato.toUpperCase().includes('KEG')) {
-                const isSteelKeg = pkg.formato.toUpperCase().includes('ACCIAIO');
-                const containerUnitCost = isSteelKeg 
-                    ? (coeffs.costo_lavaggio_fusto_acciaio || 0)
-                    : (priceDb.find(p => p.NOME === config.nomeInvCont)?.PREZZO || 0);
+                const containerUnitCost = parseFloat(pkg.costoContenitore.replace(',', '.')) || 0;
                 
                 const containerCostPerLiter = config.litriUnit > 0 ? containerUnitCost / config.litriUnit : 0;
                 kegs.push({
+                    nome: pkg.nome,
                     formato: pkg.formato,
                     beerCostPerLiter: analysisSummary.beerPricePerLiter,
                     containerCostPerLiter,
@@ -228,13 +204,16 @@ export const BrewQuoteView: React.FC<BrewQuoteViewProps> = ({ selectedYear, quot
                 });
             } else if (pkg.formato.toUpperCase().includes('BOTT')) {
                 const beerCost = analysisSummary.beerPricePerLiter * config.litriUnit;
-                const bottleCost = priceDb.find(p => p.NOME === config.nomeInvCont)?.PREZZO || 0;
-                const cartonPrice = config.nomeInvScatola ? priceDb.find(p => p.NOME === config.nomeInvScatola)?.PREZZO || 0 : 0;
+                const bottleCost = parseFloat(pkg.costoContenitore.replace(',', '.')) || 0;
+                const cartonPrice = parseFloat(pkg.costoScatola.replace(',', '.')) || 0;
+                const capPrice = parseFloat(pkg.costoTappo.replace(',', '.')) || 0;
+                
                 const cartonCostPerBottle = config.pezziPerCartone > 0 ? cartonPrice / config.pezziPerCartone : 0;
                 const labelCost = quoteData.useLabels ? (coeffs.costo_etichetta || 0) : 0;
 
                 const finalPricePerBottle = beerCost + bottleCost + capPrice + cartonCostPerBottle + labelCost;
                 bottles.push({
+                    nome: pkg.nome,
                     formato: pkg.formato,
                     totalBottles: qta,
                     beerCost, bottleCost, capPrice, cartonCostPerBottle, labelCost, finalPricePerBottle,
@@ -244,7 +223,7 @@ export const BrewQuoteView: React.FC<BrewQuoteViewProps> = ({ selectedYear, quot
         });
 
         return { kegs, bottles };
-    }, [packaging, analysisSummary, priceDb, coeffs, quoteData.useLabels]);
+    }, [packaging, analysisSummary, coeffs, quoteData.useLabels]);
     
     const handleSaveQuote = async () => {
          if (!quoteData.cliente || !quoteData.nomeBirra || !quoteData.litriFinali) {
@@ -327,14 +306,12 @@ export const BrewQuoteView: React.FC<BrewQuoteViewProps> = ({ selectedYear, quot
                      </div>
                      <div className="bg-brew-dark-secondary p-4 rounded-lg shadow-lg">
                         <h2 className="text-xl font-bold mb-4">{t('brewQuote.ingredientsTitle')}</h2>
-                        <div className="space-y-2">
+                        <div className="space-y-4">
                             {ingredients.map(ing => (
-                                <div key={ing.id} className="grid grid-cols-[1fr,auto,auto] gap-2 items-center">
-                                    <select value={ing.priceDbId} onChange={e => updateIngredient(ing.id, 'priceDbId', e.target.value)} className="bg-brew-dark p-1.5 rounded-md text-sm w-full">
-                                        <option value="">{t('brewQuote.selectIngredient')}</option>
-                                        {ingredientPriceDb.map(p => <option key={`${p.NOME}|${p.MARCA}|${p.FORNITORE}`} value={`${p.NOME}|${p.MARCA}|${p.FORNITORE}`}>{`${p.NOME} (${p.MARCA}) - €${p.PREZZO.toFixed(2)}`}</option>)}
-                                    </select>
-                                    <input type="text" placeholder={t('brewQuote.quantity')} value={ing.qta} onChange={e => updateIngredient(ing.id, 'qta', e.target.value)} className="bg-brew-dark p-1.5 rounded-md text-sm w-24"/>
+                                <div key={ing.id} className="grid grid-cols-[1fr,auto,auto,auto] gap-2 items-center bg-brew-dark p-2 rounded-md">
+                                    <input type="text" placeholder="Nome ingrediente" value={ing.nome} onChange={e => updateIngredient(ing.id, 'nome', e.target.value)} className="bg-brew-dark-secondary p-1.5 rounded-md text-sm w-full border border-slate-600"/>
+                                    <input type="text" placeholder="Qta (Kg/L)" value={ing.qta} onChange={e => updateIngredient(ing.id, 'qta', e.target.value)} className="bg-brew-dark-secondary p-1.5 rounded-md text-sm w-24 border border-slate-600"/>
+                                    <input type="text" placeholder="€/Unità" value={ing.prezzoUnitario} onChange={e => updateIngredient(ing.id, 'prezzoUnitario', e.target.value)} className="bg-brew-dark-secondary p-1.5 rounded-md text-sm w-24 border border-slate-600"/>
                                     <button onClick={() => removeIngredient(ing.id)} className="p-1 text-red-500 hover:text-red-400"><TrashIcon className="w-5 h-5"/></button>
                                 </div>
                             ))}
@@ -343,15 +320,23 @@ export const BrewQuoteView: React.FC<BrewQuoteViewProps> = ({ selectedYear, quot
                      </div>
                       <div className="bg-brew-dark-secondary p-4 rounded-lg shadow-lg">
                         <h2 className="text-xl font-bold mb-4">{t('brewQuote.packagingTitle')}</h2>
-                        <div className="space-y-2">
+                        <div className="space-y-4">
                              {packaging.map(pkg => (
-                                <div key={pkg.id} className="grid grid-cols-[1fr,auto,auto] gap-2 items-center">
-                                    <select value={pkg.formato} onChange={e => updatePackaging(pkg.id, 'formato', e.target.value)} className="bg-brew-dark p-1.5 rounded-md text-sm w-full">
-                                        <option value="">Seleziona Formato...</option>
-                                        {Object.keys(CONFIG_PACKAGING).map(f => <option key={f} value={f}>{f}</option>)}
-                                    </select>
-                                    <input type="number" placeholder={t('brewQuote.pieces')} value={pkg.qta} onChange={e => updatePackaging(pkg.id, 'qta', e.target.value)} className="bg-brew-dark p-1.5 rounded-md text-sm w-24"/>
-                                    <button onClick={() => removePackaging(pkg.id)} className="p-1 text-red-500 hover:text-red-400"><TrashIcon className="w-5 h-5"/></button>
+                                <div key={pkg.id} className="grid grid-cols-1 gap-2 items-center bg-brew-dark p-2 rounded-md">
+                                    <div className="grid grid-cols-[1fr,auto,auto] gap-2">
+                                        <input type="text" placeholder="Nome bene (es. Bottiglia 33cl personalizzata)" value={pkg.nome} onChange={e => updatePackaging(pkg.id, 'nome', e.target.value)} className="bg-brew-dark-secondary p-1.5 rounded-md text-sm w-full border border-slate-600"/>
+                                        <select value={pkg.formato} onChange={e => updatePackaging(pkg.id, 'formato', e.target.value)} className="bg-brew-dark-secondary p-1.5 rounded-md text-sm w-40 border border-slate-600">
+                                            <option value="">Seleziona Formato...</option>
+                                            {Object.keys(CONFIG_PACKAGING).map(f => <option key={f} value={f}>{f}</option>)}
+                                        </select>
+                                        <button onClick={() => removePackaging(pkg.id)} className="p-1 text-red-500 hover:text-red-400"><TrashIcon className="w-5 h-5"/></button>
+                                    </div>
+                                    <div className="grid grid-cols-4 gap-2">
+                                        <input type="number" placeholder="Qta (Pezzi)" value={pkg.qta} onChange={e => updatePackaging(pkg.id, 'qta', e.target.value)} className="bg-brew-dark-secondary p-1.5 rounded-md text-sm w-full border border-slate-600"/>
+                                        <input type="text" placeholder="Costo Contenitore (€)" value={pkg.costoContenitore} onChange={e => updatePackaging(pkg.id, 'costoContenitore', e.target.value)} className="bg-brew-dark-secondary p-1.5 rounded-md text-sm w-full border border-slate-600"/>
+                                        <input type="text" placeholder="Costo Scatola (€)" value={pkg.costoScatola} onChange={e => updatePackaging(pkg.id, 'costoScatola', e.target.value)} className="bg-brew-dark-secondary p-1.5 rounded-md text-sm w-full border border-slate-600" disabled={pkg.formato.toUpperCase().includes('FUSTO') || pkg.formato.toUpperCase().includes('KEG')}/>
+                                        <input type="text" placeholder="Costo Tappo (€)" value={pkg.costoTappo} onChange={e => updatePackaging(pkg.id, 'costoTappo', e.target.value)} className="bg-brew-dark-secondary p-1.5 rounded-md text-sm w-full border border-slate-600" disabled={pkg.formato.toUpperCase().includes('FUSTO') || pkg.formato.toUpperCase().includes('KEG')}/>
+                                    </div>
                                 </div>
                             ))}
                         </div>
