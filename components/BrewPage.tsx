@@ -33,6 +33,8 @@ interface IngredientRowState {
     tipologia: string;
     nome: string;
     lotto_fornitore: string;
+    marca: string;
+    fornitore: string;
     qta: string;
     gia_scaricato: boolean;
 }
@@ -137,11 +139,14 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
             ...m,
             NOME: m.NOME ? m.NOME.toUpperCase().trim() : '',
             LOTTO_FORNITORE: m.LOTTO_FORNITORE ? m.LOTTO_FORNITORE.toUpperCase().trim() : '',
+            MARCA: m.MARCA ? m.MARCA.toUpperCase().trim() : '',
+            FORNITORE: m.FORNITORE ? m.FORNITORE.toUpperCase().trim() : '',
         }));
 
         normalizedMovements.forEach(m => {
-            if (m.NOME && m.LOTTO_FORNITORE) {
-                const key = `${m.NOME}|${m.LOTTO_FORNITORE}`;
+            if (m.NOME) {
+                const lotto = m.LOTTO_FORNITORE || 'NESSUN_LOTTO';
+                const key = `${m.NOME}|${m.MARCA}|${m.FORNITORE}|${lotto}`;
                 lotStockMap[key] = (lotStockMap[key] || 0) + m.KG_LITRI_PZ;
 
                 if (m.KG_LITRI_PZ > 0 && !lotDetailsMap[key]) {
@@ -153,12 +158,17 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
         Object.entries(lotStockMap).forEach(([entryKey, giacenza]) => {
             const key = entryKey as string;
             if (giacenza >= 0.01) {
-                const [nome, lotto] = key.split('|');
-                const details = lotDetailsMap[key] || { nome, marca: 'N/D', fornitore: 'N/D' };
+                const [nome, marca, fornitore, lotto] = key.split('|');
+                const details = lotDetailsMap[key] || { nome, marca, fornitore };
                 if (!stock[nome]) {
                     stock[nome] = [];
                 }
-                stock[nome].push({ lotto, giacenza, ...details });
+                stock[nome].push({ 
+                    lotto: lotto === 'NESSUN_LOTTO' ? '' : lotto, 
+                    giacenza, 
+                    marca: details.marca, 
+                    fornitore: details.fornitore 
+                });
             }
         });
         return stock;
@@ -200,7 +210,7 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
 
             const lotMovements = data.MOVIMENTAZIONE.filter(m => m.LOTTO_PRODUZIONE === lottoId && m.KG_LITRI_PZ < 0 && ingredientCategories.includes(m.TIPOLOGIA));
             setIngredients(lotMovements.map((m, i) => ({
-                id: i, tipologia: m.TIPOLOGIA, nome: m.NOME, lotto_fornitore: m.LOTTO_FORNITORE, qta: String(Math.abs(m.KG_LITRI_PZ)), gia_scaricato: true
+                id: i, tipologia: m.TIPOLOGIA, nome: m.NOME, lotto_fornitore: m.LOTTO_FORNITORE, marca: m.MARCA || '', fornitore: m.FORNITORE || '', qta: String(Math.abs(m.KG_LITRI_PZ)), gia_scaricato: true
             })));
 
             setFermentationData(data.FERMENTAZIONE.filter(f => f.LOTTO === lottoId).sort((a,b) => a.GIORNO - b.GIORNO));
@@ -291,6 +301,8 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
                     nome: ing.nome,
                     qta: String(ing.qta).replace('.', ','),
                     lotto_fornitore: '',
+                    marca: '',
+                    fornitore: '',
                     gia_scaricato: false,
                 }));
                 setIngredients(newIngredientsFromRecipe);
@@ -306,7 +318,7 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
 
 
     const addIngredientRow = (tipologia: string) => {
-        setIngredients(prev => [...prev, { id: Date.now(), tipologia, nome: '', lotto_fornitore: '', qta: '', gia_scaricato: false }]);
+        setIngredients(prev => [...prev, { id: Date.now(), tipologia, nome: '', lotto_fornitore: '', marca: '', fornitore: '', qta: '', gia_scaricato: false }]);
     };
     
     const [editingIngredientId, setEditingIngredientId] = useState<number | null>(null);
@@ -333,10 +345,21 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
                     newIng.nome = value;
                     if (!editingIngredientId) {
                          newIng.lotto_fornitore = '';
+                         newIng.marca = '';
+                         newIng.fornitore = '';
                     }
                     break;
                 case 'lotto_fornitore':
-                    newIng.lotto_fornitore = value;
+                    if (value) {
+                        const [lotto, marca, fornitore] = value.split('|');
+                        newIng.lotto_fornitore = lotto;
+                        newIng.marca = marca || '';
+                        newIng.fornitore = fornitore || '';
+                    } else {
+                        newIng.lotto_fornitore = '';
+                        newIng.marca = '';
+                        newIng.fornitore = '';
+                    }
                     break;
                 case 'qta':
                     newIng.qta = value;
@@ -378,14 +401,12 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
         const ingredientMovements = ingredients
             .filter(ing => ing.nome && ing.qta && ing.lotto_fornitore)
             .map(ing => {
-                const lots = ingredientLotsStock[ing.nome.toUpperCase()] || [];
-                const lotInfo = lots.find(l => l.lotto === ing.lotto_fornitore.toUpperCase());
                 return {
                     DATA: header.DATA_PROD,
                     TIPOLOGIA: ing.tipologia,
                     NOME: ing.nome,
-                    MARCA: lotInfo?.marca || 'N/D',
-                    FORNITORE: lotInfo?.fornitore || 'N/D',
+                    MARCA: ing.marca || '',
+                    FORNITORE: ing.fornitore || '',
                     KG_LITRI_PZ: -parseFloat(ing.qta.replace(',', '.')),
                     N_FATTURA: `SCARICO_COTTA_${upperLotto}`,
                     LOTTO_FORNITORE: ing.lotto_fornitore,
@@ -560,19 +581,21 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
 
         // 1. Container
         const containerName = config.nomeInvCont;
-        const containerLotto = pkgMaterialSelections[containerName];
-        if (!containerLotto) { showToast(`Seleziona un lotto per ${containerName}`, 'error'); return; }
-        const containerInfo = (ingredientLotsStock[containerName.toUpperCase()] || []).find(l => l.lotto === containerLotto.toUpperCase());
+        const containerSelection = pkgMaterialSelections[containerName];
+        if (!containerSelection) { showToast(`Seleziona un lotto per ${containerName}`, 'error'); return; }
+        const [containerLotto, containerMarca, containerFornitore] = containerSelection.split('|');
+        const containerInfo = (ingredientLotsStock[containerName.toUpperCase()] || []).find(l => l.lotto === containerLotto && l.marca === containerMarca && l.fornitore === containerFornitore);
         if(!containerInfo) { showToast(`Info lotto non trovate per ${containerName}`, 'error'); return; }
         fabbisogni.push({ NOME: containerName, TIPOLOGIA: containerName.includes('BOTT') ? 'BOTTIGLIE' : 'FUSTI', QTA: qta, lotto: containerLotto, marca: containerInfo.marca, fornitore: containerInfo.fornitore });
 
         // 2. Carton
         if (config.nomeInvScatola && useCartons) {
             const cartonName = config.nomeInvScatola;
-            const cartonLotto = pkgMaterialSelections[cartonName];
-            if (!cartonLotto) { showToast(`Seleziona un lotto per ${cartonName}`, 'error'); return; }
+            const cartonSelection = pkgMaterialSelections[cartonName];
+            if (!cartonSelection) { showToast(`Seleziona un lotto per ${cartonName}`, 'error'); return; }
+            const [cartonLotto, cartonMarca, cartonFornitore] = cartonSelection.split('|');
             const cartonQta = Math.ceil(qta / config.pezziPerCartone);
-            const cartonInfo = (ingredientLotsStock[cartonName.toUpperCase()] || []).find(l => l.lotto === cartonLotto.toUpperCase());
+            const cartonInfo = (ingredientLotsStock[cartonName.toUpperCase()] || []).find(l => l.lotto === cartonLotto && l.marca === cartonMarca && l.fornitore === cartonFornitore);
             if(!cartonInfo) { showToast(`Info lotto non trovate per ${cartonName}`, 'error'); return; }
             fabbisogni.push({ NOME: cartonName, TIPOLOGIA: 'CARTONI', QTA: cartonQta, lotto: cartonLotto, marca: cartonInfo.marca, fornitore: cartonInfo.fornitore });
         }
@@ -580,16 +603,17 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
         // 3. Cap
         if (formato.includes("BOTT")) {
             if (!selectedCapName) { showToast("Seleziona un tipo di tappo", 'error'); return; }
-            const capLotto = pkgMaterialSelections[selectedCapName];
-            if (!capLotto) { showToast(`Seleziona un lotto per ${selectedCapName}`, 'error'); return; }
-            const capInfo = (ingredientLotsStock[selectedCapName.toUpperCase()] || []).find(l => l.lotto === capLotto.toUpperCase());
+            const capSelection = pkgMaterialSelections[selectedCapName];
+            if (!capSelection) { showToast(`Seleziona un lotto per ${selectedCapName}`, 'error'); return; }
+            const [capLotto, capMarca, capFornitore] = capSelection.split('|');
+            const capInfo = (ingredientLotsStock[selectedCapName.toUpperCase()] || []).find(l => l.lotto === capLotto && l.marca === capMarca && l.fornitore === capFornitore);
             if(!capInfo) { showToast(`Info lotto non trovate per ${selectedCapName}`, 'error'); return; }
             fabbisogni.push({ NOME: selectedCapName, TIPOLOGIA: 'TAPPI', QTA: qta, lotto: capLotto, marca: capInfo.marca, fornitore: capInfo.fornitore });
         }
 
         for (const item of fabbisogni) {
             const availableLots = ingredientLotsStock[item.NOME.toUpperCase()] || [];
-            const selectedLotInfo = availableLots.find(l => l.lotto === item.lotto.toUpperCase());
+            const selectedLotInfo = availableLots.find(l => l.lotto === item.lotto && l.marca === item.marca && l.fornitore === item.fornitore);
             if (!selectedLotInfo || selectedLotInfo.giacenza < item.QTA) {
                 showToast(`Materiale insufficiente: ${item.NOME} (Lotto: ${item.lotto}). Necessari: ${item.QTA}, Disponibili: ${selectedLotInfo?.giacenza || 0}`, 'error');
                 return;
@@ -768,17 +792,17 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
                                     {ing.gia_scaricato && !isEditing ? (
                                         <input 
                                             type="text" 
-                                            value={ing.lotto_fornitore} 
+                                            value={`${ing.lotto_fornitore || 'NESSUN LOTTO'} - ${ing.marca} - ${ing.fornitore}`} 
                                             className="bg-brew-dark p-1.5 rounded-md text-sm w-full disabled:opacity-70 border border-transparent" 
                                             disabled 
                                         />
                                     ) : (
-                                        <select value={ing.lotto_fornitore} onChange={e => updateIngredientRow(ing.id, 'lotto_fornitore', e.target.value)} className="bg-brew-dark p-1.5 rounded-md text-sm w-full disabled:opacity-50" disabled={(isLottoClosed && !isEditing) || !ing.nome}>
+                                        <select value={ing.lotto_fornitore ? `${ing.lotto_fornitore}|${ing.marca}|${ing.fornitore}` : ''} onChange={e => updateIngredientRow(ing.id, 'lotto_fornitore', e.target.value)} className="bg-brew-dark p-1.5 rounded-md text-sm w-full disabled:opacity-50" disabled={(isLottoClosed && !isEditing) || !ing.nome}>
                                             <option value="">Seleziona Lotto...</option>
-                                            {(ingredientLotsStock[ing.nome.toUpperCase()] || []).map(l => <option key={l.lotto} value={String(l.lotto)}>{`${l.lotto} (Giac: ${l.giacenza.toFixed(2)})`}</option>)}
+                                            {(ingredientLotsStock[ing.nome.toUpperCase()] || []).map(l => <option key={`${l.lotto}|${l.marca}|${l.fornitore}`} value={`${l.lotto}|${l.marca}|${l.fornitore}`}>{`${l.lotto || 'NESSUN LOTTO'} - ${l.marca} - ${l.fornitore} (Giac: ${l.giacenza.toFixed(2)})`}</option>)}
                                             {/* If editing and the current lot is not in stock (e.g. fully used), add it as an option */}
-                                            {isEditing && ing.lotto_fornitore && !(ingredientLotsStock[ing.nome.toUpperCase()] || []).some(l => l.lotto === ing.lotto_fornitore) && (
-                                                <option value={ing.lotto_fornitore}>{ing.lotto_fornitore} (Esaurito)</option>
+                                            {isEditing && ing.lotto_fornitore && !(ingredientLotsStock[ing.nome.toUpperCase()] || []).some(l => l.lotto === ing.lotto_fornitore && l.marca === ing.marca && l.fornitore === ing.fornitore) && (
+                                                <option value={`${ing.lotto_fornitore}|${ing.marca}|${ing.fornitore}`}>{ing.lotto_fornitore || 'NESSUN LOTTO'} - {ing.marca} - {ing.fornitore} (Esaurito)</option>
                                             )}
                                         </select>
                                     )}
@@ -961,7 +985,7 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
                                                 <Field label="Lotto Tappo">
                                                     <select value={pkgMaterialSelections[selectedCapName] || ''} onChange={e => setPkgMaterialSelections(p => ({...p, [selectedCapName]: e.target.value}))} className="w-full bg-brew-dark-secondary p-2 rounded-md border border-slate-600 text-sm" disabled={isLottoClosed || !selectedCapName}>
                                                         <option value="">Seleziona lotto...</option>
-                                                        {availableCapLots.map(l => <option key={l.lotto} value={l.lotto}>{`${l.lotto} (Giac: ${l.giacenza.toFixed(2)})`}</option>)}
+                                                        {availableCapLots.map(l => <option key={`${l.lotto}|${l.marca}|${l.fornitore}`} value={`${l.lotto}|${l.marca}|${l.fornitore}`}>{`${l.lotto || 'NESSUN LOTTO'} - ${l.marca} - ${l.fornitore} (Giac: ${l.giacenza.toFixed(2)})`}</option>)}
                                                     </select>
                                                 </Field>
                                             </div>
@@ -973,7 +997,7 @@ const BrewPage: React.FC<BrewPageProps> = ({ selectedYear, lottoId, onExit, onSa
                                                 <label className="text-sm font-semibold">{mat.name}</label>
                                                 <select value={pkgMaterialSelections[mat.name] || ''} onChange={e => setPkgMaterialSelections(p => ({...p, [mat.name]: e.target.value}))} className="w-full bg-brew-dark-secondary p-2 rounded-md border border-slate-600 text-sm" disabled={isLottoClosed}>
                                                     <option value="">Seleziona lotto...</option>
-                                                    {availableLots.map(l => <option key={l.lotto} value={l.lotto}>{`${l.lotto} (Giac: ${l.giacenza.toFixed(2)})`}</option>)}
+                                                    {availableLots.map(l => <option key={`${l.lotto}|${l.marca}|${l.fornitore}`} value={`${l.lotto}|${l.marca}|${l.fornitore}`}>{`${l.lotto || 'NESSUN LOTTO'} - ${l.marca} - ${l.fornitore} (Giac: ${l.giacenza.toFixed(2)})`}</option>)}
                                                 </select>
                                             </div>
                                         );
