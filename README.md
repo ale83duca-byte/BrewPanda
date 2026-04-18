@@ -53,9 +53,9 @@ Se desideri visualizzare il progetto localmente:
 
 ## ⚠️ Copyright e Proprietà
 
-© 2026 Alessandro Duca. Tutti i diritti riservati.
+© 2026 Alessio Duca. Tutti i diritti riservati.
 
-Questo software è di proprietà esclusiva di **Alessandro Duca**. 
+Questo software è di proprietà esclusiva di **Alessio Duca**. 
 Il codice sorgente è reso pubblico a scopo puramente illustrativo e di consultazione. 
 **Non è concessa l'autorizzazione all'uso, alla copia, alla modifica o alla ridistribuzione del software** in alcuna forma, per scopi commerciali o privati, senza l'idoneo consenso scritto del proprietario.
 
